@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 RUN npm install -g tsx@4.19.2
+RUN npm install mongoose
 COPY . .
 EXPOSE 3000
 CMD ["npx", "tsx", "src/index.ts"]

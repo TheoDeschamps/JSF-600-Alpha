@@ -1,21 +1,22 @@
 version: '3.8'
+
 services:
   app:
     build: .
     ports:
-      - "3000:3000"
-      - "3001:3001"
-      - "3002:3002"
-      - "3003:3003"
-      - "3004:3004"
-      - "3005:3005"
-      - "3006:3006"
-      - "3007:3007"
-      - "3008:3008"
-      - "3009:3009"
-      - "3010:3010"
-    volumes:
-      - .:/app
-      - /app/node_modules
+      - "3000-3003:3000-3003"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
