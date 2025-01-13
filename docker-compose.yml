@@ -6,7 +6,7 @@ services:
     ports:
       - "3000-3003:3000-3003"
     environment:
-      - NODE_ENV=production
+      - DOCKER_ENV=true
     depends_on:
       - mongo
 

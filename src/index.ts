@@ -11,7 +11,11 @@ import { createAdapter, setupPrimary } from '@socket.io/cluster-adapter';
 // Connexion à MongoDB
 const connectDB = async () => {
     try {
-        await mongoose.connect('mongodb://mongo:27017/chatDB', {
+        const mongoURL = process.env.DOCKER_ENV
+            ? 'mongodb://mongo:27017/chatDB' // URL pour Docker
+            : 'mongodb://127.0.0.1:27017/chatDB'; // URL pour exécution locale
+
+        await mongoose.connect(mongoURL, {
         // @ts-ignore
             useNewUrlParser: true,
             useUnifiedTopology: true
@@ -70,7 +74,7 @@ if (cluster.isPrimary) {
                 io.emit('chat message', msg);
                 callback();
             } catch (e) {
-                // @ts-ignore
+                //@ts-ignore
                 if (e.code === 11000) { // Duplicate key error (client_offset unique violation)
                     callback();
                 }
@@ -80,7 +84,7 @@ if (cluster.isPrimary) {
         if (!socket.recovered) {
             try {
                 const messages = await Message.find({
-                    _id: { $gt: socket.handshake.auth.serverOffset ? new mongoose.Types.ObjectId(socket.handshake.auth.serverOffset) : new mongoose.Types.ObjectId(0) }
+                    _id: { $gt: socket.handshake.auth.serverOffset ? new mongoose.Types.ObjectId(socket.handshake.auth.serverOffset) : new mongoose.Types.ObjectId('000000000000000000000000') }
                 }).exec();
                 messages.forEach((row) => {
                     socket.emit('chat message', row.content, row._id);
@@ -101,4 +105,3 @@ if (cluster.isPrimary) {
         console.log(`Server running at http://localhost:${port}`);
     });
 }
-
