@@ -25,6 +25,12 @@ cd JSF-600-Alpha
 ```bash
 npm install
 ```
+```bash
+cd client
+```
+```bash
+npm install
+```
 
 ---
 
@@ -34,14 +40,35 @@ npm install
 
 #### Étape 1 : Configurer MongoDB
 1. Assurez-vous que MongoDB est installé et en cours d'exécution sur `localhost:27017`.
-2. MongoDB est géré automatiquement par le fichier `index.ts`, aucune configuration manuelle n'est nécessaire. Assurez-vous simplement que MongoDB est accessible via `localhost:27017` ou que Docker est configuré correctement.
+2. MongoDB est géré automatiquement par le fichier `index.ts`. Aucune configuration manuelle n'est requise, assurez-vous simplement que MongoDB est accessible via `localhost:27017`.
 
-#### Étape 2 : Lancer l'application
-1. Démarrez le serveur avec :
+#### Étape 2 : Compiler et lancer le backend
+1. Compilez le projet TypeScript :
    ```bash
-   npx tsx src/index.ts
+   tsc
    ```
-2. L'application sera accessible sur `http://localhost:3000` à `http://localhost:3007`.
+2. Lancez le backend compilé :
+   ```bash
+   node dist/index.js
+   ```
+
+L'application sera accessible sur `http://localhost:8000`.
+
+#### Étape 3 : Lancer le frontend
+1. Allez dans le dossier `client` :
+   ```bash
+   cd client
+   ```
+2. Lancez le frontend :
+   ```bash
+   npm start
+   ```
+3. Ouvrez le frontend dans votre navigateur à l'adresse suivante :
+   ```
+   http://localhost:3000
+   ```
+
+---
 
 ### Avec Docker
 
@@ -53,10 +80,11 @@ Assurez-vous que Docker est installé et configuré sur votre système.
    ```bash
    docker-compose up --build
    ```
-2. L'application sera accessible sur `http://localhost:3000` à `http://localhost:3003`.
+2. L'application sera accessible sur `http://localhost:8000` pour le backend et `http://localhost:3000` pour le frontend.
 
 #### Étape 3 : Arrêter les conteneurs
 Pour arrêter les services :
 ```bash
 docker-compose down
 ```
+
