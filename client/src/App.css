@@ -94,7 +94,8 @@ h1 {
 }
 
 input[type="text"],
-button {
+button,
+textarea{
   display: block;
   width: 100%;
   padding: 10px;
@@ -104,7 +105,7 @@ button {
   border: none;
 }
 
-input[type="text"] {
+input[type="text"], textarea {
   background: var(--color-background);
   box-shadow: var(--box-shadow-inset-md);
   padding-left: 20px;
