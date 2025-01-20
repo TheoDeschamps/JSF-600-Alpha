@@ -6,21 +6,15 @@ function App() {
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState<string[]>([]);
 
-    // Récupérer les messages existants et écouter les nouveaux messages
     useEffect(() => {
-        // Recevoir tous les messages existants
         socket.on("messages", (msgs) => {
-            setMessages(msgs.map((msg: any) => msg.message)); // Extraire uniquement `message`
+            setMessages(msgs.map((msg: any) => msg.message));
         });
 
-        // Écouter les nouveaux messages en temps réel
         socket.on("chat message", (newMessage) => {
-            setMessages((prevMessages) => [...prevMessages, newMessage.message]); // Ajouter le nouveau message
+            setMessages((prevMessages) => [...prevMessages, newMessage.message]);
         });
 
-
-
-        // Nettoyer les écouteurs lors du démontage du composant
         return () => {
             socket.off("messages");
             socket.off("chat message");
@@ -28,10 +22,10 @@ function App() {
     }, []);
 
     const sendMessage = (e?: React.FormEvent) => {
-        if (e) e.preventDefault(); // Empêcher le rechargement de la page
+        if (e) e.preventDefault();
         if (message.trim()) {
-            socket.emit('chat message', { message }); // Envoyer un objet avec `message`
-            setMessage(''); // Réinitialiser le champ de saisie
+            socket.emit('chat message', { message });
+            setMessage('');
         }
     };
 

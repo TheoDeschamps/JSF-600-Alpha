@@ -93,7 +93,6 @@ h1 {
   margin-bottom: var(--spacing-md);
 }
 
-/* Regroupement des styles communs à l'input et au button */
 input[type="text"],
 button {
   display: block;
@@ -105,11 +104,10 @@ button {
   border: none;
 }
 
-/* Input texte */
 input[type="text"] {
   background: var(--color-background);
   box-shadow: var(--box-shadow-inset-md);
-  padding-left: 20px; /* ou utilisez var(--spacing-md) si vous préférez */
+  padding-left: 20px;
 }
 
 input[type="text"]::placeholder {
@@ -117,7 +115,6 @@ input[type="text"]::placeholder {
   font-size: var(--font-size-base);
 }
 
-/* Bouton */
 button {
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -126,15 +123,14 @@ button {
   color: var(--color-white);
   font-weight: 900;
   cursor: pointer;
-  transition: var(--transition-default);
-  box-shadow: var(--box-shadow-md);
+  box-shadow: var(--box-shadow-md);/* Ce pti konn.rd est carré */
 }
 
 button:hover {
+  transition: var(--transition-default);
   background: var(--color-primary-hover);
 }
 
-/* Liste */
 ul {
   list-style: none;
 }
