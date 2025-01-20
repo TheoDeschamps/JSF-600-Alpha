@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { socket } from "./index";
+import React, {useEffect, useState} from "react";
+import {socket} from "./index";
+import './App.css';
 
 function App() {
     const [message, setMessage] = useState("");
@@ -17,6 +18,8 @@ function App() {
             setMessages((prevMessages) => [...prevMessages, newMessage.message]); // Ajouter le nouveau message
         });
 
+
+
         // Nettoyer les écouteurs lors du démontage du composant
         return () => {
             socket.off("messages");
@@ -24,7 +27,8 @@ function App() {
         };
     }, []);
 
-    const sendMessage = () => {
+    const sendMessage = (e?: React.FormEvent) => {
+        if (e) e.preventDefault(); // Empêcher le rechargement de la page
         if (message.trim()) {
             socket.emit('chat message', { message }); // Envoyer un objet avec `message`
             setMessage(''); // Réinitialiser le champ de saisie
@@ -32,20 +36,24 @@ function App() {
     };
 
     return (
-        <div>
+        <div className={"globalAppDiv"}>
             <h1>Chat Application</h1>
-            <input
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a message..."
-            />
-            <button onClick={sendMessage}>Send</button>
-            <ul>
-                {messages.map((msg, index) => (
-                    <li key={index}>{msg}</li>
-                ))}
-            </ul>
+            <div className={'container'}>
+                <ul>
+                    {messages.map((msg, index) => (
+                        <li key={index}>{msg}</li>
+                    ))}
+                </ul>
+                <form className={"messageSendDiv"} onSubmit={sendMessage}>
+                    <input
+                        type="text"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="Type a message..."
+                    />
+                    <button type="submit">Send</button>
+                </form>
+            </div>
         </div>
     );
 }
