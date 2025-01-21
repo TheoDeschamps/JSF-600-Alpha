@@ -9,6 +9,7 @@ yarn-error.log*
 .pnp.js
 
 .vscode/*
+/dist
 
 Chat_IRC.md
 .env
