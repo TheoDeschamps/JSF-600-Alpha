@@ -21,7 +21,7 @@
 
   --box-shadow-lg: 14px 14px 20px var(--color-shadow),
   -14px -14px 20px var(--color-white);
-  --box-shadow-md: 6px 6px 6px var(--color-shadow),
+  --box-shadow-md: 0 0 6px var(--color-shadow),
   -6px -6px 6px var(--color-white);
   --box-shadow-inset-md: inset 6px 6px 6px var(--color-shadow),
   inset -6px -6px 6px var(--color-white);
@@ -124,7 +124,8 @@ button {
   color: var(--color-white);
   font-weight: 900;
   cursor: pointer;
-  box-shadow: var(--box-shadow-md);/* Ce pti konn.rd est carré */
+  border-radius: var(--radius-lg);
+  box-shadow: var(--box-shadow-md);
 }
 
 button:hover {
@@ -139,6 +140,9 @@ ul {
 li {
   padding: 8px;
   border-radius: var(--radius-md);
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
 }
 
 li:last-child {
