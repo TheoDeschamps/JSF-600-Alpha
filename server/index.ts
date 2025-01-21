@@ -17,13 +17,14 @@ const io = new Server(server, {
 // Connexion MongoDB
 await mongoose.connect('mongodb://127.0.0.1:27017/chatDB');
 
+
 // Configurer Express pour servir les fichiers statiques
 app.use(express.static('public'));
 
 // Rediriger la racine `/` vers `index.html`
-app.get('/', (req, res) => {
+/*app.get('/', (req, res) => {
     res.sendFile('index.html', { root: './public' });
-});
+});*/
 
 // Charger les gestionnaires Socket.IO
 io.on('connection', (socket) => {
@@ -46,7 +47,7 @@ io.on('connection', (socket) => {
 });
 
 // Lancer le serveur
-const PORT = process.env.PORT || 3000;
+const PORT = 8000;
 server.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
