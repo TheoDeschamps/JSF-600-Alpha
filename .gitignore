@@ -11,5 +11,7 @@ yarn-error.log*
 .vscode/*
 /dist
 
+/dist
+
 Chat_IRC.md
 .env
