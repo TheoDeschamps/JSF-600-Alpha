@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { socket } from "./index";
 import './App.css';
 
@@ -6,6 +6,21 @@ function App() {
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState<string[]>([]);
     const [isTextarea, setIsTextarea] = useState(false);
+
+    const textAreaRef = useRef<HTMLTextAreaElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isTextarea) {
+            textAreaRef.current?.focus();
+            const length = message.length;
+            textAreaRef.current?.setSelectionRange(length, length);
+        } else {
+            inputRef.current?.focus();
+            const length = message.length;
+            inputRef.current?.setSelectionRange(length, length);
+        }
+    }, [isTextarea, message]);
 
     useEffect(() => {
         socket.on("messages", (msgs) => {
@@ -61,15 +76,16 @@ function App() {
                 <form className={"messageSendDiv"} onSubmit={sendMessage}>
                     {isTextarea ? (
                         <textarea
+                            ref={textAreaRef}
                             value={message}
                             onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
-                            placeholder="Type a message..."
                             rows={3}
-                            style={{ resize: "none" }}
+                            placeholder="Type a message..."
                         />
                     ) : (
                         <input
+                            ref={inputRef}
                             type="text"
                             value={message}
                             onChange={handleInputChange}
@@ -82,5 +98,4 @@ function App() {
         </div>
     );
 }
-
 export default App;
