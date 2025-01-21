@@ -1,51 +1,111 @@
 import { Server, Socket } from 'socket.io';
-import {nicknames} from './users.js'; // Import du Map pour gérer les nicknames
+import Channel from '../models/channel.js';
+import Message from '../models/message.js';
+import { nicknames } from './users.js';
 
-export default function registerChannelHandlers(io: Server, socket: Socket) {
-    // Créer un channel
-    socket.on('create_channel', (channelName) => {
+// Créer un channel
+async function createChannel(io: Server, socket: Socket, channelName: string) {
+    if (!channelName || channelName.trim() === '') {
+        socket.emit('error', 'Channel name cannot be empty');
+        return;
+    }
+
+    try {
+        const existingChannel = await Channel.findOne({ name: channelName });
+        if (existingChannel) {
+            socket.emit('error', 'Channel already exists');
+            return;
+        }
+
+        const channel = new Channel({ name: channelName });
+        await channel.save();
+
         socket.join(channelName);
         io.emit('channel_created', channelName);
-    });
-
-    // Lister les channels
-    socket.on('list_channels', (keyword) => {
-        const channels = Array.from(io.sockets.adapter.rooms.keys())
-            .filter((channel) => !io.sockets.sockets.has(channel)) // Éviter de lister les sockets comme channels
-            .filter((channel) => channel.includes(keyword || ''));
-        socket.emit('channels_list', channels);
-    });
-
-    // Rejoindre un channel
-    socket.on('join_channel', (channelName) => {
-        const nickname = nicknames.get(socket.id); // Récupérer le nickname depuis le Map
-        socket.join(channelName);
-        socket.to(channelName).emit('user_joined', `${nickname} joined ${channelName}`);
-    });
-
-    // Quitter un channel
-    socket.on('quit_channel', (channelName) => {
-        const nickname = nicknames.get(socket.id); // Récupérer le nickname depuis le Map
-        socket.leave(channelName);
-        socket.to(channelName).emit('user_left', `${nickname} left ${channelName}`);
-    });
-
-    // Supprimer un channel
-    socket.on('delete_channel', (channelName) => {
-        if (io.sockets.adapter.rooms.has(channelName)) {
-            // Notifier tous les utilisateurs du channel
-            io.to(channelName).emit('channel_deleted', `${channelName} has been deleted`);
-
-            // Supprimer tous les utilisateurs du channel
-            const clients = io.sockets.adapter.rooms.get(channelName);
-            clients?.forEach((clientId) => {
-                const clientSocket = io.sockets.sockets.get(clientId);
-                clientSocket?.leave(channelName);
-            });
-
-            socket.emit('channel_removed', `${channelName} successfully deleted`);
-        } else {
-            socket.emit('error', 'Channel not found');
-        }
-    });
+    } catch (err) {
+        console.error('Error creating channel:', err);
+        socket.emit('error', 'Failed to create channel');
+    }
 }
+
+// Lister les channels
+async function listChannels(io: Server, socket: Socket, keyword: string = '') {
+    try {
+        const channels = await Channel.find({ name: { $regex: keyword, $options: 'i' } }).exec();
+        socket.emit('channels_list', channels.map((channel) => channel.name));
+    } catch (err) {
+        console.error('Error listing channels:', err);
+        socket.emit('error', 'Failed to list channels');
+    }
+}
+
+// Rejoindre un channel
+function joinChannel(io: Server, socket: Socket, channelName: string) {
+    if (!channelName || channelName.trim() === '') {
+        socket.emit('error', 'Channel name cannot be empty');
+        return;
+    }
+
+    const nickname = nicknames.get(socket.id);
+    socket.join(channelName);
+
+    Message.find({ channel: channelName })
+        .sort({ createdAt: 1 })
+        .exec()
+        .then((messages) => {
+            socket.emit('channel_messages', messages);
+        })
+        .catch((err) => {
+            console.error('Error retrieving messages:', err);
+            socket.emit('error', 'Failed to retrieve messages');
+        });
+
+    io.to(channelName).emit('user_joined', `${nickname} joined ${channelName}`);
+}
+
+// Quitter un channel
+function quitChannel(io: Server, socket: Socket, channelName: string) {
+    const nickname = nicknames.get(socket.id);
+    socket.leave(channelName);
+    io.to(channelName).emit('user_left', `${nickname} left ${channelName}`);
+}
+
+// Supprimer un channel
+async function deleteChannel(io: Server, socket: Socket, channelName: string) {
+    if (!channelName || channelName.trim() === '') {
+        socket.emit('error', 'Channel name cannot be empty');
+        return;
+    }
+
+    try {
+        const clients = io.sockets.adapter.rooms.get(channelName);
+        if (!clients) {
+            socket.emit('error', 'Channel not found');
+            return;
+        }
+
+        clients.forEach((clientId) => {
+            const clientSocket = io.sockets.sockets.get(clientId);
+            clientSocket?.leave(channelName);
+        });
+
+        await Message.deleteMany({ channel: channelName });
+        await Channel.deleteOne({ name: channelName });
+
+        io.emit('channel_deleted', `${channelName} has been deleted`);
+    } catch (err) {
+        console.error('Error deleting channel:', err);
+        socket.emit('error', 'Failed to delete channel');
+    }
+}
+
+// Regrouper les fonctions dans un objet et exporter par défaut
+const registerChannelHandlers = {
+    createChannel,
+    listChannels,
+    joinChannel,
+    quitChannel,
+    deleteChannel,
+};
+
+export default registerChannelHandlers;

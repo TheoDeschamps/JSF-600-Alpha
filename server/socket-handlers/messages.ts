@@ -1,63 +1,108 @@
 import { Server, Socket } from 'socket.io';
-import mongoose from 'mongoose';
-import {MongoError} from "mongodb";
+import { handleCommand } from './commandHandlers.js';
 import { nicknames } from './users.js';
-import Message from "../models/message.js";
+import Message from '../models/message.js';
+import Channel from '../models/channel.js'; // Import pour les channels
 
 export default function registerMessageHandlers(io: Server, socket: Socket) {
-    // Envoyer un message dans un channel
-    socket.on('message', async ({ channel, content, client_offset }) => {
-        try {
-            const nickname = nicknames.get(socket.id); // Récupérer le nickname depuis le Map
-            const message = new Message({
-                content,
-                channel,
-                nickname,
-                client_offset,
-            });
-            await message.save();
-            io.to(channel).emit('new_message', {
-                content,
-                nickname,
-                createdAt: message.createdAt,
-            });
-        } catch (e) {
-            if (e instanceof MongoError && e.code === 11000) {
-                console.log('Duplicate message ignored');
+    // Gestion de l'envoi des messages
+    socket.on('message', async ({ content, channel = 'general' }) => {
+        if (content.startsWith('/')) {
+            // Gestion des commandes via commandHandlers
+            const [command, ...args] = content.split(' ');
+            handleCommand(io, socket, command, args);
+        } else {
+            // Validation du contenu du message
+            if (!content || content.trim() === '') {
+                socket.emit('error', 'Message cannot be empty');
+                return;
+            }
+
+            // Récupération du pseudonyme
+            const nickname = nicknames.get(socket.id) || 'Anonymous';
+
+            try {
+                // Sauvegarder le message dans MongoDB
+                const message = new Message({ content, channel, nickname });
+                await message.save();
+
+                // Diffuser le message à tous les utilisateurs du channel
+                io.to(channel).emit('new_message', {
+                    content,
+                    nickname,
+                    channel,
+                    createdAt: message.createdAt,
+                });
+            } catch (error) {
+                console.error('Error saving message:', error);
+                socket.emit('error', 'Failed to save message');
             }
         }
     });
 
-    // Récupérer l'historique des messages
+    // Gestion de la récupération de l’historique des messages
     socket.on('messages', async (channelName) => {
+        if (!channelName || channelName.trim() === '') {
+            socket.emit('error', 'Channel name cannot be empty');
+            return;
+        }
 
         try {
             const messages = await Message.find({ channel: channelName })
-                .sort({ createdAt: 1 })
+                .sort({ createdAt: 1 }) // Trier les messages par date croissante
                 .exec();
-            socket.emit('channel_messages', messages);
-        }
-        catch (err){
-            console.error('Error retrieving messages:', err);
+
+            socket.emit('channel_messages', messages); // Envoyer l’historique au client
+        } catch (error) {
+            console.error('Error retrieving messages:', error);
+            socket.emit('error', 'Failed to retrieve messages');
         }
     });
 
-    // Envoyer un message privé
-    socket.on('private_message', ({ toNickname, content }) => {
-        const recipient = Array.from(io.sockets.sockets).find(
-            ([clientId]) => nicknames.get(clientId) === toNickname
-        );
-        if (recipient) {
-            recipient[1].emit('private_message', {
+    // Gestion de l'envoi des messages privés
+    socket.on('private_message', async ({ toNickname, content }) => {
+        const sender = nicknames.get(socket.id);
+        const recipientRecord = await Channel.findOne({ name: `private-${[sender, toNickname].sort().join('-')}` });
+        const recipientSocketId = Array.from(nicknames.entries())
+            .find(([id, nick]) => nick === toNickname)?.[0];
+
+        if (!recipientRecord && !recipientSocketId) {
+            socket.emit('error', `Recipient not found: ${toNickname}`);
+            return;
+        }
+
+        const privateChannelName = `private-${[sender, toNickname].sort().join('-')}`; // Nom unique pour le channel privé
+
+        try {
+            // Vérifier ou créer le channel privé
+            if (!recipientRecord) {
+                const privateChannel = new Channel({ name: privateChannelName });
+                await privateChannel.save();
+            }
+
+            // Sauvegarder le message dans MongoDB avec le channel privé
+            const message = new Message({
                 content,
-                from: nicknames.get(socket.id), // Récupérer le nickname de l'expéditeur depuis le Map
+                nickname: sender,
+                channel: privateChannelName,
             });
-        }
-    });
 
-    // Gestion de la déconnexion (optionnel)
-    socket.on('disconnect', () => {
-        nicknames.delete(socket.id); // Supprimer le nickname associé à ce socket.id
-        console.log(`User disconnected: ${socket.id}`);
+            await message.save();
+
+            // Ajouter les utilisateurs au channel privé
+            socket.join(privateChannelName);
+            if (recipientSocketId) {
+                io.to(recipientSocketId).socketsJoin(privateChannelName);
+            }
+
+            // Envoyer le message aux deux utilisateurs
+            socket.emit('private_message', { content, to: toNickname, from: sender });
+            if (recipientSocketId) {
+                io.to(recipientSocketId).emit('private_message', { content, from: sender });
+            }
+        } catch (err) {
+            console.error('Error saving private message:', err);
+            socket.emit('error', 'Failed to send private message');
+        }
     });
 }

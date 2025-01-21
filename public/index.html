@@ -5,178 +5,182 @@
     <title>Socket.IO Chat</title>
     <style>
         body {
-            margin: 0;
-            padding-bottom: 3rem;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        #form {
-            background: rgba(0, 0, 0, 0.15);
-            padding: 0.25rem;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
             display: flex;
-            height: 3rem;
-            box-sizing: border-box;
-            backdrop-filter: blur(10px);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1e3a5f; /* Bleu marine foncé */
+            color: white;
         }
 
-        #input {
-            border: none;
-            padding: 0 1rem;
-            flex-grow: 1;
-            border-radius: 2rem;
-            margin: 0.25rem;
-        }
-
-        #input:focus {
-            outline: none;
-        }
-
-        #form > button {
-            background: #333;
-            border: none;
-            padding: 0 1rem;
-            margin: 0.25rem;
-            border-radius: 3px;
-            outline: none;
-            color: #fff;
+        #chat-container {
+            width: 50%;
+            height: 60%;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+            background-color: #2b4c7e; /* Bleu marine plus clair */
         }
 
         #messages {
             list-style-type: none;
-            margin: 0;
             padding: 0;
+            flex-grow: 1;
+            overflow-y: auto;
+            margin: 0;
         }
 
         #messages > li {
-            padding: 0.5rem 1rem;
+            padding: 8px 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            background: #3e5b90; /* Bleu marine intermédiaire */
+            color: white;
         }
 
         #messages > li:nth-child(odd) {
-            background: #efefef;
+            background: #4a6ea5; /* Bleu un peu plus clair */
+        }
+
+        #form {
+            display: flex;
+            margin-top: auto;
+        }
+
+        #input {
+            flex-grow: 1;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            outline: none;
+            background-color: #2b4c7e; /* Bleu marine plus clair */
+            color: white;
+        }
+
+        #form > button {
+            margin-left: 10px;
+            padding: 10px 15px;
+            border: none;
+            background: #1e3a5f; /* Bleu marine principal */
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #form > button:hover {
+            background: #16304a; /* Bleu marine plus foncé */
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
 <h1>Socket.IO Chat</h1>
-<div>
-    <input id="nickname" type="text" placeholder="Enter your nickname" />
-    <button onclick="setNickname()">Set Nickname</button>
+<div id="chat-container">
+    <ul id="messages"></ul>
+    <form id="form" action="">
+        <input id="input" autocomplete="off" placeholder="Type a command or message here..." />
+        <button>Send</button>
+    </form>
 </div>
-<div>
-    <select id="channel">
-        <option value="general">General</option>
-        <option value="random">Random</option>
-    </select>
-    <button onclick="joinChannel()">Join Channel</button>
-    <button onclick="leaveChannel()">Leave Channel</button>
-</div>
-<ul id="messages"></ul>
-<form id="form" action="">
-    <input id="input" autocomplete="off" placeholder="Type a message" />
-    <button>Send</button>
-</form>
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
 
-    const nicknameInput = document.getElementById('nickname');
-    const channelSelect = document.getElementById('channel');
-    const messages = document.getElementById('messages');
     const form = document.getElementById('form');
     const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
 
-    // Set nickname
-    function setNickname() {
-        const nickname = nicknameInput.value.trim();
-        if (nickname) {
-            socket.emit('nick', nickname);
-            alert(`Nickname set to: ${nickname}`);
+    let currentChannel = 'general'; // Default channel
+
+    // Define commands
+    const commands = {
+        '/nick': (args) => socket.emit('message', { content: `/nick ${args[0]}` }),
+        '/create': (args) => socket.emit('message', { content: `/create ${args[0]}` }),
+        '/list': (args) => socket.emit('message', { content: `/list ${args[0] || ''}` }),
+        '/delete': (args) => socket.emit('message', { content: `/delete ${args[0]}` }),
+        '/join': (args) => {
+            currentChannel = args[0];
+            socket.emit('message', { content: `/join ${args[0]}` });
+        },
+        '/quit': (args) => {
+            currentChannel = 'general';
+            socket.emit('message', { content: `/quit ${args[0]}` });
+        },
+        '/users': (args) => socket.emit('message', { content: `/users ${args[0] || currentChannel}` }),
+        '/msg': (args) => {
+            const [toNickname, ...content] = args;
+            socket.emit('message', { content: `/msg ${toNickname} ${content.join(' ')}` });
         }
-    }
+    };
 
-    // Join a channel
-    function joinChannel() {
-        const channel = channelSelect.value;
-        socket.emit('join_channel', channel);
-        alert(`Joined channel: ${channel}`);
-    }
-
-    // Leave a channel
-    function leaveChannel() {
-        const channel = channelSelect.value;
-        socket.emit('quit_channel', channel);
-        alert(`Left channel: ${channel}`);
-    }
-
-    // Form submission for sending messages
+    // Handle commands and messages
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (input.value) {
-            const channel = channelSelect.value;
-            socket.emit('message', { channel, content: input.value });
-            input.value = '';
+        const message = input.value.trim();
+
+        if (message.startsWith('/')) {
+            const [command, ...args] = message.split(' ');
+            if (commands[command]) {
+                commands[command](args);
+                appendMessage(`Command executed: ${command} ${args.join(' ')}`);
+            } else {
+                appendMessage(`Unknown command: ${command}`);
+            }
+        } else {
+            socket.emit('message', { channel: currentChannel, content: message });
         }
+
+        input.value = '';
     });
 
-    // Listen for new messages
+    // Append messages to the list
+    function appendMessage(msg) {
+        const item = document.createElement('li');
+        item.textContent = msg;
+        messages.appendChild(item);
+        messages.scrollTop = messages.scrollHeight; // Auto-scroll
+    }
+
+    // Listen for server messages
     socket.on('new_message', (data) => {
-        const item = document.createElement('li');
-        item.textContent = `${data.nickname}: ${data.content}`;
-        messages.appendChild(item);
-        window.scrollTo(0, document.body.scrollHeight);
+        appendMessage(`${data.nickname}: ${data.content}`);
     });
 
-    // Notification for user joining
-    socket.on('user_joined', (msg) => {
-        const item = document.createElement('li');
-        item.textContent = msg;
-        messages.appendChild(item);
-    });
-
-    // Notification for user leaving
-    socket.on('user_left', (msg) => {
-        const item = document.createElement('li');
-        item.textContent = msg;
-        messages.appendChild(item);
-    });
-
-    // Receive private messages
     socket.on('private_message', (data) => {
-        const item = document.createElement('li');
-        item.textContent = `Private from ${data.from}: ${data.content}`;
-        messages.appendChild(item);
+        appendMessage(`Private from ${data.from}: ${data.content}`);
     });
 
-    // Listen for channel-related events
-    socket.on('channel_created', (channelName) => {
-        alert(`Channel created: ${channelName}`);
-    });
-
-    socket.on('channel_deleted', (msg) => {
-        const item = document.createElement('li');
-        item.textContent = msg;
-        messages.appendChild(item);
-    });
-
-    socket.on('connect', () => {
-        const channel = channelSelect.value;
-        socket.emit('messages', channel); // Demander les messages pour le channel actuel
-    });
-
-    socket.on('channel_messages', (messages) => {
-        messages.forEach((msg) => {
-            const item = document.createElement('li');
-            item.textContent = `${msg.nickname}: ${msg.content}`;
-            messages.appendChild(item);
+    socket.on('channel_messages', (msgs) => {
+        msgs.forEach((msg) => {
+            appendMessage(`${msg.nickname}: ${msg.content}`);
         });
     });
 
-    socket.on('error', (error) => {
-        alert(`Error: ${error}`);
+    // Listen for the channels_list event
+    socket.on('channels_list', (channels) => {
+        if (channels.length > 0) {
+            appendMessage('Available channels:');
+            channels.forEach((channel) => {
+                appendMessage(`- ${channel}`);
+            });
+        } else {
+            appendMessage('No channels available.');
+        }
+    });
+
+    socket.on('error', (err) => {
+        appendMessage(`Error: ${err}`);
     });
 </script>
 </body>

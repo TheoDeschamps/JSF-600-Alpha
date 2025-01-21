@@ -2,10 +2,13 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import mongoose from 'mongoose';
+import registerChannelHandlers from './socket-handlers/channels.js';
+import registerUserHandlers from './socket-handlers/users.js';
+import registerMessageHandlers from './socket-handlers/messages.js';
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-    cors: { origin: '*' }, // Permettre les connexions depuis n'importe quelle origine
+    cors: { origin: '*' },
 });
 // Connexion MongoDB
 await mongoose.connect('mongodb://127.0.0.1:27017/chatDB');
@@ -16,16 +19,16 @@ app.get('/', (req, res) => {
     res.sendFile('index.html', { root: './public' });
 });
 // Charger les gestionnaires Socket.IO
-import './models/message.js';
-import registerChannelHandlers from './socket-handlers/channels.js';
-import registerUserHandlers from './socket-handlers/users.js';
-import registerMessageHandlers from './socket-handlers/messages.js';
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
-    // Enregistrer les gestionnaires
     registerUserHandlers(io, socket);
-    registerChannelHandlers(io, socket);
     registerMessageHandlers(io, socket);
+    // Enregistrer les gestionnaires de channels
+    socket.on('create_channel', (channelName) => registerChannelHandlers.createChannel(io, socket, channelName));
+    socket.on('list_channels', (keyword) => registerChannelHandlers.listChannels(io, socket, keyword));
+    socket.on('join_channel', (channelName) => registerChannelHandlers.joinChannel(io, socket, channelName));
+    socket.on('quit_channel', (channelName) => registerChannelHandlers.quitChannel(io, socket, channelName));
+    socket.on('delete_channel', (channelName) => registerChannelHandlers.deleteChannel(io, socket, channelName));
     // Déconnexion
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
