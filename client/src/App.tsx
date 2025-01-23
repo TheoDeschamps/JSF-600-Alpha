@@ -151,7 +151,7 @@ function App() {
                             onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
                             rows={3}
-                            placeholder="Type a message or command..."
+                            style={{ resize: "none" }}
                         />
                     ) : (
                         <input

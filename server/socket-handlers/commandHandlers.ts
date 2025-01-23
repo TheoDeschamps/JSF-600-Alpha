@@ -31,7 +31,7 @@ export function handleCommand(io: Server, socket: Socket, command: string, args:
 }
 
 // Gestion de `/nick`
-async function handleNick(io: Server, socket: Socket, nickname: string) {
+export async function handleNick(io: Server, socket: Socket, nickname: string) {
     if (!nickname || nickname.trim() === '') {
         socket.emit('error', 'Nickname cannot be empty');
         return;

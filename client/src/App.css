@@ -2,7 +2,7 @@
 
 :root {
   --color-primary: #1DA1F2;
-  --color-primary-hover: #0f75bc;
+  --color-primary-hover: #00ff15;
   --color-background: #ecf0f3;
   --color-background-secondary: #f0f2f4;
   --color-white: #fff;
@@ -131,6 +131,7 @@ button {
 button:hover {
   transition: var(--transition-default);
   background: var(--color-primary-hover);
+  box-shadow: none;
 }
 
 ul {
