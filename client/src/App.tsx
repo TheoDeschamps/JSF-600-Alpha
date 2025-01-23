@@ -11,10 +11,6 @@ function App() {
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    /**
-     * Gestion de l'autofocus & du curseur de fin de texte
-     * lors du basculement input <-> textarea
-     */
     useEffect(() => {
         if (isTextarea) {
             textAreaRef.current?.focus();
@@ -27,12 +23,8 @@ function App() {
         }
     }, [isTextarea, message]);
 
-    /**
-     * Écoute des événements socket côté client
-     * pour mettre à jour la liste des messages reçus.
-     */
+
     useEffect(() => {
-        // -- Nouveaux events envoyés par le serveur (par le code HTML de ton collègue) --
         socket.on("new_message", (data) => {
             setMessages((prev) => [...prev, `${data.nickname}: ${data.content}`]);
         });
@@ -42,7 +34,6 @@ function App() {
         });
 
         socket.on("channel_messages", (msgs) => {
-            // On reçoit un tableau de messages
             msgs.forEach((msg: any) => {
                 setMessages((prev) => [...prev, `${msg.nickname}: ${msg.content}`]);
             });
@@ -60,23 +51,9 @@ function App() {
             }
         });
 
-        // -- Gestion d'erreur générique --
         socket.on("error", (err) => {
             setMessages((prev) => [...prev, `Error: ${err}`]);
         });
-
-        /**
-         * Si dans le back tu as encore besoin des anciens events
-         * ('messages' / 'chat message'), tu peux les réactiver ici:
-         *
-         * socket.on("messages", (msgs) => {
-         *   setMessages(msgs.map((msg: any) => msg.message));
-         * });
-         *
-         * socket.on("chat message", (newMessage) => {
-         *   setMessages((prevMessages) => [...prevMessages, newMessage.message]);
-         * });
-         */
 
         return () => {
             socket.off("new_message");
@@ -84,15 +61,9 @@ function App() {
             socket.off("channel_messages");
             socket.off("channels_list");
             socket.off("error");
-
-            // socket.off("messages");
-            // socket.off("chat message");
         };
     }, []);
 
-    /**
-     * Commandes disponibles (similaires à celles définies dans la version HTML)
-     */
     const commands: { [key: string]: (args: string[]) => void } = {
         "/nick": (args) => socket.emit("message", { content: `/nick ${args[0]}` }),
         "/create": (args) => socket.emit("message", { content: `/create ${args[0]}` }),
@@ -115,10 +86,6 @@ function App() {
         },
     };
 
-    /**
-     * Fonction qui gère le changement d'input/textarea
-     * (et le basculement vers un textarea si > 90 caractères)
-     */
     const handleInputChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
@@ -132,20 +99,15 @@ function App() {
         }
     };
 
-    /**
-     * Envoi d'un message OU exécution d'une commande
-     */
     const handleSendMessage = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         const trimmedMessage = message.trim();
         if (!trimmedMessage) return;
 
-        // Si le message commence par '/', on interprète comme commande
         if (trimmedMessage.startsWith("/")) {
             const [command, ...args] = trimmedMessage.split(" ");
             if (commands[command]) {
                 commands[command](args);
-                // Affiche un feedback dans la liste (optionnel)
                 setMessages((prev) => [
                     ...prev,
                     `Command executed: ${command} ${args.join(" ")}`
@@ -154,7 +116,6 @@ function App() {
                 setMessages((prev) => [...prev, `Unknown command: ${command}`]);
             }
         } else {
-            // Sinon on envoie un message normal (au channel courant)
             socket.emit("message", {
                 channel: currentChannel,
                 content: trimmedMessage,
@@ -165,10 +126,6 @@ function App() {
         setIsTextarea(false);
     };
 
-    /**
-     * Gestion de la touche "Enter + Shift" pour envoyer
-     * (inversé par rapport à d'autres applis, mais conforme à ton code initial)
-     */
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && e.shiftKey) {
             e.preventDefault();
