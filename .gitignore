@@ -1,6 +1,7 @@
 /tmp
 /out-tsc
 
+/coverage
 /node_modules
 npm-debug.log*
 yarn-debug.log*
@@ -11,8 +12,5 @@ yarn-error.log*
 .vscode/*
 /dist
 
-/dist
-
 Chat_IRC.md
 .env
-/coverage/
