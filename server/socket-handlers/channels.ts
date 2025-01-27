@@ -4,7 +4,7 @@ import Message from '../models/message.js';
 import { nicknames } from './users.js';
 
 // Créer un channel
-async function createChannel(io: Server, socket: Socket, channelName: string) {
+export async function createChannel(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
@@ -71,7 +71,7 @@ function quitChannel(io: Server, socket: Socket, channelName: string) {
 }
 
 // Supprimer un channel
-async function deleteChannel(io: Server, socket: Socket, channelName: string) {
+export async function deleteChannel(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
