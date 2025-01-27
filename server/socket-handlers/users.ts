@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import Nickname from '../models/nickname.js';
+import User from '../models/user.js';
 import Message from '../models/message.js';
 
 // Map global pour stocker les pseudonymes des utilisateurs
@@ -64,7 +65,7 @@ export default function registerUserHandlers(io: Server, socket: Socket) {
 }
 
 // Fonction : Lister les utilisateurs d'un channel
-export function listUsers(io: Server, socket: Socket, channelName: string) {
+export async function listUsers(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
