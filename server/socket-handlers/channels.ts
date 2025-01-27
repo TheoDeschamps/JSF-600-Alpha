@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import Channel from '../models/channel.js';
 import Message from '../models/message.js';
+import User from '../models/user.js';
 import { nicknames } from './users.js';
 
 // Créer un channel
@@ -28,6 +29,30 @@ async function createChannel(io: Server, socket: Socket, channelName: string) {
     }
 }
 
+// renamer un channel
+async function renameChannel(io: Server, socket: Socket, channelName: string, newChannelName: string) {
+    if (!channelName || channelName.trim() === '' || !newChannelName || newChannelName.trim() === '') {
+        socket.emit('error', 'Channel name cannot be empty');
+        return;
+    }
+
+    try {
+        const existingChannel = await Channel.findOne({ name: channelName });
+        if (!existingChannel) {
+            socket.emit('error', 'Channel not found');
+            return;
+        }
+
+        existingChannel.name = newChannelName;
+        await existingChannel.save();
+
+        io.emit('channel_renamed', { oldName: channelName, newName: newChannelName });
+    } catch (err) {
+        console.error('Error renaming channel:', err);
+        socket.emit('error', 'Failed to rename channel');
+    }
+}
+
 // Lister les channels
 async function listChannels(io: Server, socket: Socket, keyword: string = '') {
     try {
@@ -39,28 +64,82 @@ async function listChannels(io: Server, socket: Socket, keyword: string = '') {
     }
 }
 
+// Lister les utilisateurs
+async function listUsers(io: Server, socket: Socket, channelName: string) {
+    if (!channelName || channelName.trim() === "") {
+        socket.emit("error", "Channel name cannot be empty");
+        return;
+    }
+
+    try {
+        // 1. Get all users who have joined this channel (from DB)
+        const usersInChannel = await User.find({ channels: channelName }).exec(); // Use "channels" array field
+
+        // 2. Get online users in this channel (from Socket.IO room)
+        const onlineSocketIds = Array.from(io.sockets.adapter.rooms.get(channelName) || []);
+        const onlineUsers = await User.find({ socketId: { $in: onlineSocketIds } }).exec();
+
+        // 3. Combine data: list nicknames with online status
+        const userList = usersInChannel.map((user) => ({
+            nickname: user.nickname,
+            isConnected: onlineUsers.some((onlineUser) => onlineUser.nickname === user.nickname),
+        }));
+
+        // 4. Send simplified data to client
+        socket.emit("users_list", userList);
+    } catch (err) {
+        console.error("Error listing users:", err);
+        socket.emit("error", "Failed to list users");
+    }
+}
+
 // Rejoindre un channel
-function joinChannel(io: Server, socket: Socket, channelName: string) {
+async function joinChannel(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
     }
 
     const nickname = nicknames.get(socket.id);
-    socket.join(channelName);
+    if (!nickname) {
+        socket.emit('error', 'Nickname is required to join a channel');
+        return;
+    }
 
-    Message.find({ channel: channelName })
-        .sort({ createdAt: 1 })
-        .exec()
-        .then((messages) => {
-            socket.emit('channel_messages', messages);
-        })
-        .catch((err) => {
-            console.error('Error retrieving messages:', err);
-            socket.emit('error', 'Failed to retrieve messages');
-        });
+    try {
+        // Ajouter l'utilisateur dans le channel au niveau de la base de données
+        const existingUser = await User.findOne({ socketId: socket.id });
 
-    io.to(channelName).emit('user_joined', `${nickname} joined ${channelName}`);
+        if (existingUser) {
+            // Mettre à jour la liste des channels de l'utilisateur
+            if (!existingUser.channels.includes(channelName)) {
+                existingUser.channels.push(channelName);
+                await existingUser.save();
+            }
+        } else {
+            // Créer un nouvel utilisateur si nécessaire
+            const newUser = new User({
+                nickname,
+                socketId: socket.id,
+                channels: [channelName],
+            });
+            await newUser.save();
+        }
+
+        // Ajouter l'utilisateur au channel via Socket.IO
+        socket.join(channelName);
+        console.log(`${nickname} joined ${channelName}. Socket rooms:`, Array.from(socket.rooms)); // Debug
+
+        // Envoyer l'historique des messages au nouvel utilisateur
+        const messages = await Message.find({ channel: channelName }).sort({ createdAt: 1 }).exec();
+        socket.emit('channel_messages', messages);
+
+        // Notifier les autres utilisateurs du channel
+        io.to(channelName).emit('user_joined', `${nickname} joined ${channelName}`);
+    } catch (err) {
+        console.error('Error handling user join:', err);
+        socket.emit('error', 'Failed to join channel');
+    }
 }
 
 // Quitter un channel
@@ -106,6 +185,8 @@ const registerChannelHandlers = {
     joinChannel,
     quitChannel,
     deleteChannel,
+    listUsers,
+    renameChannel,
 };
 
 export default registerChannelHandlers;

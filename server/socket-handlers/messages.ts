@@ -61,47 +61,55 @@ export default function registerMessageHandlers(io: Server, socket: Socket) {
 
     // Gestion de l'envoi des messages privés
     socket.on('private_message', async ({ toNickname, content }) => {
-        const sender = nicknames.get(socket.id);
-        const recipientRecord = await Channel.findOne({ name: `private-${[sender, toNickname].sort().join('-')}` });
-        const recipientSocketId = Array.from(nicknames.entries())
-            .find(([id, nick]) => nick === toNickname)?.[0];
+        const sender = nicknames.get(socket.id); // Get sender's nickname
 
-        if (!recipientRecord && !recipientSocketId) {
-            socket.emit('error', `Recipient not found: ${toNickname}`);
+        if (!sender) {
+            socket.emit('error', 'You must set a nickname with /nick first');
             return;
         }
 
-        const privateChannelName = `private-${[sender, toNickname].sort().join('-')}`; // Nom unique pour le channel privé
+        // Generate unique private channel name (alphabetical order to avoid duplicates)
+        const privateChannelName = `private-${[sender, toNickname].sort().join('-')}`;
 
         try {
-            // Vérifier ou créer le channel privé
-            if (!recipientRecord) {
-                const privateChannel = new Channel({ name: privateChannelName });
-                await privateChannel.save();
+            // Check if the recipient exists
+            const recipientSocketId = Array.from(nicknames.entries())
+                .find(([id, nick]) => nick === toNickname)?.[0];
+
+            if (!recipientSocketId) {
+                socket.emit('error', `User "${toNickname}" is not online`);
+                return;
             }
 
-            // Sauvegarder le message dans MongoDB avec le channel privé
+            // Create the private channel if it doesn't exist
+            let channel = await Channel.findOne({ name: privateChannelName });
+            if (!channel) {
+                channel = new Channel({ name: privateChannelName });
+                await channel.save();
+            }
+
+            // Add both users to the channel
+            socket.join(privateChannelName);
+            io.to(recipientSocketId).socketsJoin(privateChannelName);
+
+            // Save the private message to MongoDB
             const message = new Message({
+                content,
+                channel: privateChannelName,
+                nickname: sender,
+                recipient: toNickname,
+            });
+            await message.save();
+
+            // Broadcast the message to the private channel
+            io.to(privateChannelName).emit('new_message', {
                 content,
                 nickname: sender,
                 channel: privateChannelName,
+                createdAt: message.createdAt,
             });
-
-            await message.save();
-
-            // Ajouter les utilisateurs au channel privé
-            socket.join(privateChannelName);
-            if (recipientSocketId) {
-                io.to(recipientSocketId).socketsJoin(privateChannelName);
-            }
-
-            // Envoyer le message aux deux utilisateurs
-            socket.emit('private_message', { content, to: toNickname, from: sender });
-            if (recipientSocketId) {
-                io.to(recipientSocketId).emit('private_message', { content, from: sender });
-            }
         } catch (err) {
-            console.error('Error saving private message:', err);
+            console.error('Error sending private message:', err);
             socket.emit('error', 'Failed to send private message');
         }
     });

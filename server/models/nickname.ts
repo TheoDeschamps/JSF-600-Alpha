@@ -4,12 +4,14 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface INickname extends Document {
     socketId: string;
     nickname: string;
+    channels : string[];
 }
 
 // Schéma pour les nicknames
 const nicknameSchema = new Schema<INickname>({
     socketId: { type: String, required: true, unique: true },
-    nickname: { type: String, required: true },
+    nickname: { type: String, required: true, unique: true },
+    channels : { type: [String],  required : true },
 });
 
 // Modèle Mongoose
