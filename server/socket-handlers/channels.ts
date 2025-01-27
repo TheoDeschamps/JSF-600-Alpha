@@ -65,7 +65,7 @@ export async function listChannels(io: Server, socket: Socket, keyword: string =
 }
 
 // Lister les utilisateurs
-async function listUsers(io: Server, socket: Socket, channelName: string) {
+export async function listUsers(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === "") {
         socket.emit("error", "Channel name cannot be empty");
         return;
