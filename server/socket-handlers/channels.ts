@@ -40,7 +40,7 @@ export async function listChannels(io: Server, socket: Socket, keyword: string =
 }
 
 // Rejoindre un channel
-function joinChannel(io: Server, socket: Socket, channelName: string) {
+export function joinChannel(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
