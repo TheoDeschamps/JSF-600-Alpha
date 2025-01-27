@@ -30,7 +30,7 @@ export async function createChannel(io: Server, socket: Socket, channelName: str
 }
 
 // renamer un channel
-async function renameChannel(io: Server, socket: Socket, channelName: string, newChannelName: string) {
+export async function renameChannel(io: Server, socket: Socket, channelName: string, newChannelName: string) {
     if (!channelName || channelName.trim() === '' || !newChannelName || newChannelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
