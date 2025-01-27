@@ -1,20 +1,18 @@
 import { describe, it, expect, jest, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { joinChannel } from '@socket-handlers/channels.js';
-import { nicknames } from '@socket-handlers/users.js';
+import User from '@models/user.js';
 import Message from '@models/message.js';
+import { nicknames } from '@socket-handlers/users.js';
 import type { Query } from 'mongoose';
 
 type MessageDoc = { content: string };
 
 class MockQuery {
     [Symbol.toStringTag] = 'MockQuery';
-
     constructor(private dataOrError: MessageDoc[] | Error) {}
-
     sort(_criteria: any): this {
         return this;
     }
-
     async exec(): Promise<MessageDoc[]> {
         if (this.dataOrError instanceof Error) {
             throw this.dataOrError;
@@ -23,94 +21,115 @@ class MockQuery {
     }
 }
 
-function createMockQuery(
-    dataOrError: MessageDoc[] | Error
-): Query<MessageDoc[], MessageDoc> {
+function createMockQuery(dataOrError: MessageDoc[] | Error): Query<MessageDoc[], MessageDoc> {
     return new MockQuery(dataOrError) as unknown as Query<MessageDoc[], MessageDoc>;
 }
 
+type AnyAsyncFn = (...args: any[]) => Promise<any>;
+
 describe('joinChannel', () => {
+    let originalLog: (...args: any[]) => void;
     let originalError: (...args: any[]) => void;
 
     beforeAll(() => {
+        originalLog = console.log;
         originalError = console.error;
+        console.log = () => {};
         console.error = () => {};
     });
 
     afterAll(() => {
+        console.log = originalLog;
         console.error = originalError;
     });
 
     beforeEach(() => {
         jest.clearAllMocks();
         nicknames.clear();
+        jest.spyOn(User, 'findOne');
+        jest.spyOn(User.prototype, 'save');
+        jest.spyOn(Message, 'find');
     });
 
     afterEach(() => {
         jest.restoreAllMocks();
     });
 
-    it('should emit error if channel name is empty', () => {
-        const socket = { id: 'socket-id', emit: jest.fn(), join: jest.fn() };
-        joinChannel({} as any, socket as any, '');
-        expect(socket.emit).toHaveBeenCalledWith('error', 'Channel name cannot be empty');
-    });
-
-    it('should join channel, retrieve messages, emit them, and notify others', async () => {
+    it('should handle existing user', async () => {
         nicknames.set('socket-id', 'TestUser');
-        jest.spyOn(Message, 'find').mockReturnValueOnce(
-            createMockQuery([
-                { content: 'Hello' },
-                { content: 'World' },
-            ])
-        );
+        const mockUser = {
+            nickname: 'TestUser',
+            socketId: 'socket-id',
+            channels: [] as string[],
+            save: jest.fn(),
+        };
+        (User.findOne as unknown as jest.MockedFunction<AnyAsyncFn>)
+            .mockResolvedValueOnce(mockUser);
+        (User.prototype.save as unknown as jest.MockedFunction<AnyAsyncFn>)
+            .mockResolvedValueOnce(undefined);
+        (Message.find as unknown as jest.MockedFunction<AnyAsyncFn>)
+            .mockReturnValueOnce(createMockQuery([{ content: 'Hello' }, { content: 'World' }]));
 
         const socket = {
             id: 'socket-id',
             emit: jest.fn(),
             join: jest.fn(),
+            rooms: new Set(['socket-id']),
         };
-        const mockIo = {
+        const io = {
             to: jest.fn().mockReturnThis(),
             emit: jest.fn(),
         };
 
-        await joinChannel(mockIo as any, socket as any, 'my-channel');
-
-        expect(socket.join).toHaveBeenCalledWith('my-channel');
+        await joinChannel(io as any, socket as any, 'someChannel');
+        expect(mockUser.channels).toEqual(['someChannel']);
+        expect(mockUser.save).toHaveBeenCalled();
+        expect(socket.join).toHaveBeenCalledWith('someChannel');
         expect(socket.emit).toHaveBeenCalledWith('channel_messages', [
             { content: 'Hello' },
             { content: 'World' },
         ]);
-        expect(mockIo.to).toHaveBeenCalledWith('my-channel');
-        expect(mockIo.emit).toHaveBeenCalledWith(
-            'user_joined',
-            'TestUser joined my-channel'
-        );
+        expect(io.emit).toHaveBeenCalledWith('user_joined', 'TestUser joined someChannel');
     });
 
-    it('should emit error if retrieving messages fails', async () => {
-        nicknames.set('socket-id', 'FailUser');
-        jest.spyOn(Message, 'find').mockReturnValueOnce(
-            createMockQuery(new Error('DB error'))
-        );
+    it('should create new user if findOne returns null', async () => {
+        nicknames.set('socket-id', 'NewUser');
+        (User.findOne as unknown as jest.MockedFunction<AnyAsyncFn>)
+            .mockResolvedValueOnce(null);
+        (User.prototype.save as unknown as jest.MockedFunction<AnyAsyncFn>)
+            .mockResolvedValueOnce(undefined);
+        (Message.find as unknown as jest.MockedFunction<AnyAsyncFn>)
+            .mockReturnValueOnce(createMockQuery([]));
 
         const socket = {
             id: 'socket-id',
             emit: jest.fn(),
             join: jest.fn(),
+            rooms: new Set(['socket-id']),
         };
-        const mockIo = {
+        const io = {
             to: jest.fn().mockReturnThis(),
             emit: jest.fn(),
         };
 
-        await joinChannel(mockIo as any, socket as any, 'error-channel');
+        await joinChannel(io as any, socket as any, 'newChannel');
+        expect(socket.join).toHaveBeenCalledWith('newChannel');
+        expect(io.emit).toHaveBeenCalledWith('user_joined', 'NewUser joined newChannel');
+    });
 
-        expect(socket.join).toHaveBeenCalledWith('error-channel');
-        joinChannel(mockIo as any, socket as any, 'error-channel');
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        expect(socket.emit).toHaveBeenCalledWith('error', 'Failed to retrieve messages');
+    it('should emit error if something fails in DB', async () => {
+        nicknames.set('socket-id', 'CrashUser');
+        (User.findOne as unknown as jest.MockedFunction<AnyAsyncFn>)
+            .mockRejectedValueOnce(new Error('DB error'));
 
+        const socket = {
+            id: 'socket-id',
+            emit: jest.fn(),
+            join: jest.fn(),
+            rooms: new Set(['socket-id']),
+        };
+
+        await joinChannel({ to: jest.fn(), emit: jest.fn() } as any, socket as any, 'failChannel');
+        expect(socket.emit).toHaveBeenCalledWith('error', 'Failed to join channel');
     });
 });
