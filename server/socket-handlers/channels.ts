@@ -29,7 +29,7 @@ async function createChannel(io: Server, socket: Socket, channelName: string) {
 }
 
 // Lister les channels
-async function listChannels(io: Server, socket: Socket, keyword: string = '') {
+export async function listChannels(io: Server, socket: Socket, keyword: string = '') {
     try {
         const channels = await Channel.find({ name: { $regex: keyword, $options: 'i' } }).exec();
         socket.emit('channels_list', channels.map((channel) => channel.name));
