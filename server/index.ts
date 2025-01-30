@@ -15,8 +15,9 @@ const io = new Server(server, {
 });
 
 // Connexion MongoDB
-await mongoose.connect('mongodb://127.0.0.1:27017/chatDB');
-
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/chatDB';
+await mongoose.connect(MONGO_URI, {
+});
 
 // Configurer Express pour servir les fichiers statiques
 app.use(express.static('public'));
