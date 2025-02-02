@@ -20,7 +20,7 @@ const io = new Server(server, {
 
 
 // Connexion MongoDB
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/chatDB';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/chatDB';
 await mongoose.connect(MONGO_URI, {
 });
 
