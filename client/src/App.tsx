@@ -6,10 +6,11 @@ function App() {
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState<string[]>([]);
     const [isTextarea, setIsTextarea] = useState(false);
-    const [currentChannel, setCurrentChannel] = useState("general");
+    const [currentChannel, setCurrentChannel] = useState("");
     const [nickname, setNickname] = useState("");
     const [isConnected, setIsConnected] = useState(false);
     const [nickError, setNickError] = useState("");
+    const [joinedChannels, setJoinedChannels] = useState<string[]>([]);
 
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -68,18 +69,26 @@ function App() {
             setMessages((prev) => [...prev, `Error: ${err}`]);
         });
 
-        /**
-         * Si dans le back tu as encore besoin des anciens events
-         * ('messages' / 'chat message'), tu peux les réactiver ici:
-         *
-         * socket.on("messages", (msgs) => {
-         *   setMessages(msgs.map((msg: any) => msg.message));
-         * });
-         *
-         * socket.on("chat message", (newMessage) => {
-         *   setMessages((prevMessages) => [...prevMessages, newMessage.message]);
-         * });
-         */
+        // Écouter les événements de channel
+        socket.on("channel_created", (channelName) => {
+            setJoinedChannels(prev => [...prev, channelName]);
+            setCurrentChannel(channelName);
+            setMessages(prev => [...prev, `Channel ${channelName} created and joined successfully`]);
+        });
+
+        socket.on("user_joined", (message) => {
+            const channelName = message.split(" joined ")[1];
+            if (!joinedChannels.includes(channelName)) {
+                setJoinedChannels(prev => [...prev, channelName]);
+            }
+            setMessages(prev => [...prev, message]);
+        });
+
+        socket.on("user_left", (message) => {
+            const channelName = message.split(" left ")[1];
+            setJoinedChannels(prev => prev.filter(ch => ch !== channelName));
+            setMessages(prev => [...prev, message]);
+        });
 
         return () => {
             socket.off("new_message");
@@ -87,11 +96,11 @@ function App() {
             socket.off("channel_messages");
             socket.off("channels_list");
             socket.off("error");
-
-            // socket.off("messages");
-            // socket.off("chat message");
+            socket.off("channel_created");
+            socket.off("user_joined");
+            socket.off("user_left");
         };
-    }, []);
+    }, [joinedChannels]);
 
     // Écoute de la validation du nickname
     useEffect(() => {
@@ -120,7 +129,9 @@ function App() {
      */
     const commands: { [key: string]: (args: string[]) => void } = {
         "/nick": (args) => socket.emit("message", { content: `/nick ${args[0]}` }),
-        "/create": (args) => socket.emit("message", { content: `/create ${args[0]}` }),
+        "/create": (args) => {
+            socket.emit("message", { content: `/create ${args[0]}` });
+        },
         "/list": (args) => socket.emit("message", { content: `/list ${args[0] || ""}` }),
         "/delete": (args) => socket.emit("message", { content: `/delete ${args[0]}` }),
         "/join": (args) => {
@@ -128,8 +139,10 @@ function App() {
             socket.emit("message", { content: `/join ${args[0]}` });
         },
         "/quit": (args) => {
-            setCurrentChannel("general");
-            socket.emit("message", { content: `/quit ${args[0]}` });
+            const channelToQuit = args[0] || currentChannel;
+            setJoinedChannels(prev => prev.filter(ch => ch !== channelToQuit));
+            setCurrentChannel("");
+            socket.emit("message", { content: `/quit ${channelToQuit}` });
         },
         "/users": (args) => {
             socket.emit("message", { content: `/users ${args[0] || currentChannel}` });
@@ -165,21 +178,23 @@ function App() {
         const trimmedMessage = message.trim();
         if (!trimmedMessage) return;
 
-        // Si le message commence par '/', on interprète comme commande
+        if (!trimmedMessage.startsWith("/") && (!currentChannel || !joinedChannels.includes(currentChannel))) {
+            setMessages(prev => [...prev, "Error: You must first join or create a channel using /create or /join"]);
+            return;
+        }
+
         if (trimmedMessage.startsWith("/")) {
             const [command, ...args] = trimmedMessage.split(" ");
             if (commands[command]) {
                 commands[command](args);
-                // Affiche un feedback dans la liste (optionnel)
-                setMessages((prev) => [
-                    ...prev,
-                    `Command executed: ${command} ${args.join(" ")}`
-                ]);
             } else {
                 setMessages((prev) => [...prev, `Unknown command: ${command}`]);
             }
         } else {
-            // Sinon on envoie un message normal (au channel courant)
+            if (!currentChannel) {
+                setMessages(prev => [...prev, "Error: You must be in a channel to send messages"]);
+                return;
+            }
             socket.emit("message", {
                 channel: currentChannel,
                 content: trimmedMessage,
@@ -250,6 +265,11 @@ function App() {
                 </div>
             ) : (
                 <div className="container">
+                    {currentChannel ? (
+                        <h2>Channel: {currentChannel}</h2>
+                    ) : (
+                        <h2 className="warning">No channel joined. Use /create or /join to start chatting</h2>
+                    )}
                     <ul>
                         {messages.map((msg, index) => (
                             <li key={index}>{msg}</li>

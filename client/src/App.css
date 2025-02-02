@@ -224,3 +224,12 @@ li:last-child {
 .login-container button:disabled {
     background: var(--color-shadow);
 }
+
+.warning {
+    color: #ff4444;
+    text-align: center;
+    padding: 10px;
+    background: rgba(255, 68, 68, 0.1);
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
