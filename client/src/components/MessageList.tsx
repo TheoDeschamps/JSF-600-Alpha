@@ -1,10 +1,10 @@
 import React from "react";
 
-interface Props {
+interface MessageListProps {
     messages: string[];
 }
 
-const MessageList: React.FC<Props> = ({ messages }) => {
+export function MessageList({ messages }: MessageListProps) {
     return (
         <ul>
             {messages.map((msg, index) => (
@@ -12,6 +12,4 @@ const MessageList: React.FC<Props> = ({ messages }) => {
             ))}
         </ul>
     );
-};
-
-export default MessageList;
+}

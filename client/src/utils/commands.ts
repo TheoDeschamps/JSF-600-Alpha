@@ -1,30 +1,58 @@
-import { socket } from "../index";
+interface CommandMap {
+    [key: string]: (args: string[]) => void;
+}
 
-export const commands: { [key: string]: (args: string[], setCurrentChannel: React.Dispatch<React.SetStateAction<string>>, setMessages: React.Dispatch<React.SetStateAction<string[]>>) => void } = {
-    "/nick": (args) => socket.emit("message", { content: `/nick ${args[0]}` }),
-    "/create": (args) => socket.emit("message", { content: `/create ${args[0]}` }),
-    "/list": (args) => socket.emit("message", { content: `/list ${args[0] || ""}` }),
-    "/delete": (args) => socket.emit("message", { content: `/delete ${args[0]}` }),
-    "/join": (args, setCurrentChannel) => {
-        setCurrentChannel(args[0]);
-        socket.emit("message", { content: `/join ${args[0]}` });
-    },
-    "/quit": (args, setCurrentChannel) => {
-        setCurrentChannel("general");
-        socket.emit("message", { content: `/quit ${args[0]}` });
-    },
-    "/users": (args, _, setMessages) => {
-        socket.emit("message", { content: `/users ${args[0]}` });
-    },
-    "/msg": (args) => {
-        const [toNickname, ...rest] = args;
-        socket.emit("message", { content: `/msg ${toNickname} ${rest.join(" ")}` });
-    },
-    "/rename": (args, _, setMessages) => {
-        if (args.length < 2) {
-            setMessages((prev) => [...prev, "Usage: /rename <oldChannelName> <newChannelName>"]);
-            return;
-        }
-        socket.emit("message", { content: `/rename ${args[0]} ${args[1]}` });
-    }
-};
+export function createCommands(
+    executeCommand: (commandLine: string) => void,
+    setCurrentChannel: (channel: string) => void,
+    addMessage: (msg: string) => void,
+    currentChannel: string
+): CommandMap {
+
+    return {
+        "/nick": (args) => {
+            executeCommand(`/nick ${args[0]}`);
+            addMessage(`Command executed: /nick ${args[0]}`);
+        },
+        "/create": (args) => {
+            executeCommand(`/create ${args[0]}`);
+            addMessage(`Command executed: /create ${args[0]}`);
+        },
+        "/list": (args) => {
+            executeCommand(`/list ${args[0] || ""}`);
+            addMessage(`Command executed: /list ${args.join(" ")}`);
+        },
+        "/delete": (args) => {
+            executeCommand(`/delete ${args[0]}`);
+            addMessage(`Command executed: /delete ${args[0]}`);
+        },
+        "/join": (args) => {
+            setCurrentChannel(args[0]);
+            executeCommand(`/join ${args[0]}`);
+            addMessage(`Command executed: /join ${args[0]}`);
+        },
+        "/quit": (args) => {
+            setCurrentChannel("general");
+            executeCommand(`/quit ${args[0]}`);
+            addMessage(`Command executed: /quit ${args[0]}`);
+        },
+        "/users": (args) => {
+            executeCommand(`/users ${args[0] || currentChannel}`);
+            addMessage(`Command executed: /users ${args[0] || currentChannel}`);
+        },
+        "/msg": (args) => {
+            const [toNickname, ...rest] = args;
+            const content = rest.join(" ");
+            executeCommand(`/msg ${toNickname} ${content}`);
+            addMessage(`Command executed: /msg ${toNickname} ${content}`);
+        },
+        "/rename": (args) => {
+            if (args.length < 2) {
+                addMessage("Usage: /rename <oldChannelName> <newChannelName>");
+                return;
+            }
+            executeCommand(`/rename ${args[0]} ${args[1]}`);
+            addMessage(`Command executed: /rename ${args[0]} ${args[1]}`);
+        },
+    };
+}

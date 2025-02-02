@@ -1,38 +1,50 @@
-import React, { useRef } from "react";
-import { commands } from "../utils/commands";
-import { socket } from "../index";
+import React, { useRef, useEffect } from "react";
 
-interface Props {
+interface MessageInputProps {
     message: string;
-    setMessage: React.Dispatch<React.SetStateAction<string>>;
-    setMessages: React.Dispatch<React.SetStateAction<string[]>>;
-    currentChannel: string;
-    setCurrentChannel: React.Dispatch<React.SetStateAction<string>>;
+    onMessageChange: (newMessage: string) => void;
+    isTextarea: boolean;
+    onSendMessage: (message: string) => void;
 }
 
-const MessageInput: React.FC<Props> = ({ message, setMessage, setMessages, currentChannel, setCurrentChannel }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
+export function MessageInput({
+                                 message,
+                                 onMessageChange,
+                                 isTextarea,
+                                 onSendMessage
+                             }: MessageInputProps) {
+
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
-    const isTextarea = message.length > 90;
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isTextarea) {
+            textAreaRef.current?.focus();
+            textAreaRef.current?.setSelectionRange(message.length, message.length);
+        } else {
+            inputRef.current?.focus();
+            inputRef.current?.setSelectionRange(message.length, message.length);
+        }
+    }, [isTextarea, message]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        onMessageChange(e.target.value);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === "Enter" && e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    };
 
     const handleSendMessage = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        const trimmedMessage = message.trim();
-        if (!trimmedMessage) return;
+        const trimmed = message.trim();
+        if (trimmed === "") return;
 
-        if (trimmedMessage.startsWith("/")) {
-            const [command, ...args] = trimmedMessage.split(" ");
-            if (commands[command]) {
-                commands[command](args, setCurrentChannel, setMessages);
-                setMessages((prev) => [...prev, `Command executed: ${command} ${args.join(" ")}`]);
-            } else {
-                setMessages((prev) => [...prev, `Unknown command: ${command}`]);
-            }
-        } else {
-            socket.emit("message", { channel: currentChannel, content: trimmedMessage });
-        }
-
-        setMessage("");
+        onSendMessage(trimmed);
+        onMessageChange("");
     };
 
     return (
@@ -41,7 +53,8 @@ const MessageInput: React.FC<Props> = ({ message, setMessage, setMessages, curre
                 <textarea
                     ref={textAreaRef}
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
                     rows={3}
                     style={{ resize: "none" }}
                 />
@@ -50,13 +63,11 @@ const MessageInput: React.FC<Props> = ({ message, setMessage, setMessages, curre
                     ref={inputRef}
                     type="text"
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={handleInputChange}
                     placeholder="Type a message or command..."
                 />
             )}
             <button type="submit">Send</button>
         </form>
     );
-};
-
-export default MessageInput;
+}
