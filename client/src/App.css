@@ -78,6 +78,9 @@ body {
 }
 
 .container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
   width: 90%;
   min-height: 80%;
   padding: var(--spacing-md);
@@ -267,4 +270,54 @@ li:last-child {
     padding: 8px 12px;
     border-radius: var(--radius-md);
     margin: 4px 0;
+}
+
+.sidebar {
+    width: 250px;
+    background-color: #2f3136;
+    padding: 20px;
+    color: #ffffff;
+    border-right: 1px solid #202225;
+}
+
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.channels-section,
+.private-channels-section {
+    margin-bottom: 30px;
+}
+
+.channels-section h3,
+.private-channels-section h3 {
+    color: #8e9297;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.channels-list {
+    list-style: none;
+    padding: 0;
+}
+
+.channels-list li {
+    padding: 8px 12px;
+    margin: 2px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.channels-list li:hover {
+    background-color: #36393f;
+}
+
+.channels-list li.active {
+    background-color: #393c43;
+    color: #fff;
 }

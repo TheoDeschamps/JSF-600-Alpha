@@ -21,6 +21,7 @@ function App() {
     const [nickError, setNickError] = useState("");
     const [isLogin, setIsLogin] = useState(false);
     const [joinedChannels, setJoinedChannels] = useState<string[]>([]);
+    const [privateChannels, setPrivateChannels] = useState<string[]>([]);
 
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +59,9 @@ function App() {
 
         socket.on("private_message", (data) => {
             const privateChannel = `private-${data.from}`;
+            setPrivateChannels(prev => 
+                prev.includes(privateChannel) ? prev : [...prev, privateChannel]
+            );
             setMessages((prev) => ({
                 ...prev,
                 [privateChannel]: Array.isArray(prev[privateChannel])
@@ -341,6 +345,13 @@ function App() {
         return () => clearTimeout(timeout);
     };
 
+    // Fonction pour changer de channel
+    const handleChannelChange = (channelName: string) => {
+        setCurrentChannel(channelName);
+        // Charger les messages si nécessaire
+        socket.emit('messages', channelName);
+    };
+
     return (
         <div className="globalAppDiv">
             <h1>Chat Application</h1>
@@ -382,52 +393,88 @@ function App() {
                 </div>
             ) : (
                 <div className="container">
-                    {currentChannel ? (
-                        <h2>Channel: {currentChannel}</h2>
-                    ) : (
-                        <h2 className="warning">No channel joined. Use /create or /join to start chatting</h2>
-                    )}
-                    <ul>
-                        {[
-                            ...(messages[currentChannel] || []),
-                            ...(notifications[currentChannel] || []),
-                            ...(notifications.system || [])
-                        ].map((msg, index) => (
-                            <li 
-                                key={index} 
-                                className={
-                                    notifications[currentChannel]?.includes(msg) || 
-                                    notifications.system?.includes(msg)
-                                        ? 'notification' 
-                                        : 'message'
-                                }
-                            >
-                                {msg}
-                            </li>
-                        ))}
-                    </ul>
-
-                    <form className="messageSendDiv" onSubmit={handleSendMessage}>
-                        {isTextarea ? (
-                            <textarea
-                                ref={textAreaRef}
-                                value={message}
-                                onChange={handleInputChange}
-                                onKeyDown={handleKeyDown}
-                                rows={3}
-                                placeholder="Type a message or command..."
-                            />
+                    <div className="sidebar">
+                        <div className="channels-section">
+                            <h3>Channels</h3>
+                            <ul className="channels-list">
+                                {joinedChannels.map((channel) => (
+                                    <li 
+                                        key={channel}
+                                        className={currentChannel === channel ? 'active' : ''}
+                                        onClick={() => handleChannelChange(channel)}
+                                    >
+                                        # {channel}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="private-channels-section">
+                            <h3>Messages Privés</h3>
+                            <ul className="channels-list">
+                                {privateChannels.map((channel) => {
+                                    const otherUser = channel.replace('private-', '').split('-')
+                                        .find(user => user !== nickname);
+                                    return (
+                                        <li 
+                                            key={channel}
+                                            className={currentChannel === channel ? 'active' : ''}
+                                            onClick={() => handleChannelChange(channel)}
+                                        >
+                                            @ {otherUser}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                    <div className="chat-area">
+                        {currentChannel ? (
+                            <h2>Channel: {currentChannel}</h2>
                         ) : (
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                value={message}
-                                onChange={handleInputChange}
-                                placeholder="Type a message or command..."
-                            />
+                            <h2 className="warning">No channel joined. Use /create or /join to start chatting</h2>
                         )}
-                        <button type="submit">Send</button>
-                    </form>
+                        <ul>
+                            {[
+                                ...(messages[currentChannel] || []),
+                                ...(notifications[currentChannel] || []),
+                                ...(notifications.system || [])
+                            ].map((msg, index) => (
+                                <li 
+                                    key={index} 
+                                    className={
+                                        notifications[currentChannel]?.includes(msg) || 
+                                        notifications.system?.includes(msg)
+                                            ? 'notification' 
+                                            : 'message'
+                                    }
+                                >
+                                    {msg}
+                                </li>
+                            ))}
+                        </ul>
+
+                        <form className="messageSendDiv" onSubmit={handleSendMessage}>
+                            {isTextarea ? (
+                                <textarea
+                                    ref={textAreaRef}
+                                    value={message}
+                                    onChange={handleInputChange}
+                                    onKeyDown={handleKeyDown}
+                                    rows={3}
+                                    placeholder="Type a message or command..."
+                                />
+                            ) : (
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={message}
+                                    onChange={handleInputChange}
+                                    placeholder="Type a message or command..."
+                                />
+                            )}
+                            <button type="submit">Send</button>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>
