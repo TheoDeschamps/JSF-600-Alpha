@@ -75,3 +75,23 @@ export function handleCommand(io: Server, socket: Socket, command: string, args:
         socket.emit('error', `Unknown command: ${command}`);
     }
 }
+
+// Gestion de `/nick`
+export async function handleNick(io: Server, socket: Socket, nickname: string) {
+    if (!nickname || nickname.trim() === '') {
+        socket.emit('error', 'Nickname cannot be empty');
+        return;
+    }
+    try {
+        await Nickname.findOneAndUpdate(
+            { socketId: socket.id },
+            { nickname },
+            { upsert: true, new: true }
+        );
+        nicknames.set(socket.id, nickname);
+        socket.emit('nick_success', `Your nickname has been set to: ${nickname}`);
+    } catch (err) {
+        console.error('Error saving nickname:', err);
+        socket.emit('error', 'Failed to save nickname');
+    }
+}

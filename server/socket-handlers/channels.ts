@@ -5,7 +5,7 @@ import User from '../models/user.js';
 import { nicknames } from './users.js';
 
 // Créer un channel
-async function createChannel(io: Server, socket: Socket, channelName: string) {
+export async function createChannel(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
@@ -34,7 +34,7 @@ async function createChannel(io: Server, socket: Socket, channelName: string) {
 }
 
 // renamer un channel
-async function renameChannel(io: Server, socket: Socket, channelName: string, newChannelName: string) {
+export async function renameChannel(io: Server, socket: Socket, channelName: string, newChannelName: string) {
     if (!channelName || channelName.trim() === '' || !newChannelName || newChannelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
@@ -58,7 +58,7 @@ async function renameChannel(io: Server, socket: Socket, channelName: string, ne
 }
 
 // Lister les channels
-async function listChannels(io: Server, socket: Socket, keyword: string = '') {
+export async function listChannels(io: Server, socket: Socket, keyword: string = '') {
     try {
         const channels = await Channel.find({ name: { $regex: keyword, $options: 'i' } }).exec();
         socket.emit('channels_list', channels.map((channel) => channel.name));
@@ -69,7 +69,7 @@ async function listChannels(io: Server, socket: Socket, keyword: string = '') {
 }
 
 // Lister les utilisateurs
-async function listUsers(io: Server, socket: Socket, channelName: string) {
+export async function listUsers(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === "") {
         socket.emit("error", "Channel name cannot be empty");
         return;
@@ -98,7 +98,7 @@ async function listUsers(io: Server, socket: Socket, channelName: string) {
 }
 
 // Rejoindre un channel
-async function joinChannel(io: Server, socket: Socket, channelName: string) {
+export async function joinChannel(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;
@@ -147,14 +147,14 @@ async function joinChannel(io: Server, socket: Socket, channelName: string) {
 }
 
 // Quitter un channel
-function quitChannel(io: Server, socket: Socket, channelName: string) {
+export function quitChannel(io: Server, socket: Socket, channelName: string) {
     const nickname = nicknames.get(socket.id);
     socket.leave(channelName);
     io.to(channelName).emit('user_left', `${nickname} left ${channelName}`);
 }
 
 // Supprimer un channel
-async function deleteChannel(io: Server, socket: Socket, channelName: string) {
+export async function deleteChannel(io: Server, socket: Socket, channelName: string) {
     if (!channelName || channelName.trim() === '') {
         socket.emit('error', 'Channel name cannot be empty');
         return;

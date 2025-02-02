@@ -18,10 +18,14 @@ const io = new Server(server, {
     }
 });
 
-// Connexion à MongoDB
-mongoose.connect('mongodb://localhost:27017/chat')
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+
+// Connexion MongoDB
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/chatDB';
+await mongoose.connect(MONGO_URI, {
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+});
+
 
 // Configurer Express pour servir les fichiers statiques
 app.use(express.static('public'));

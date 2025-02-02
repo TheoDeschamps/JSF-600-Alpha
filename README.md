@@ -29,7 +29,7 @@ npm install
 cd client
 ```
 ```bash
-npm install
+npm install --force
 ```
 
 ---
