@@ -24,8 +24,10 @@ function App() {
         (newMsg: string) => {
             sendMessage(`(info) ${newMsg}`);
         },
-        currentChannel
+        currentChannel,
+        sendMessage
     );
+
 
     
     const handleSendMessage = (text: string) => {

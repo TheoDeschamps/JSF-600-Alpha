@@ -60,7 +60,6 @@ export function useChat(): UseChatReturn {
             setMessages((prev) => [...prev, `Error: ${err}`]);
         });
 
-        // Nettoyage
         return () => {
             socket.off("new_message");
             socket.off("private_message");
@@ -71,9 +70,9 @@ export function useChat(): UseChatReturn {
         };
     }, []);
 
-    function sendMessage(content: string) {
+    function sendMessage(content: string, channelOverride?: string) {
         socket.emit("message", {
-            channel: currentChannel,
+            channel: channelOverride ?? currentChannel,
             content,
         });
     }

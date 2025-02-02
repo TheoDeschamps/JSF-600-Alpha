@@ -6,8 +6,10 @@ export function createCommands(
     executeCommand: (commandLine: string) => void,
     setCurrentChannel: (channel: string) => void,
     addMessage: (msg: string) => void,
-    currentChannel: string
-): CommandMap {
+    currentChannel: string,
+    sendMessage: (content: string, channelOverride?: string) => void
+):
+    CommandMap {
 
     return {
         "/nick": (args) => {
@@ -27,15 +29,22 @@ export function createCommands(
             addMessage(`Command executed: /delete ${args[0]}`);
         },
         "/join": (args) => {
-            setCurrentChannel(args[0]);
-            executeCommand(`/join ${args[0]}`);
-            addMessage(`Command executed: /join ${args[0]}`);
+            const channelName = args[0];
+            if (!channelName) {
+                addMessage("Usage: /join <channelName>");
+                return;
+            }
+            setCurrentChannel(channelName);
+            executeCommand(`/join ${channelName}`);
+            sendMessage(`il nous a rejoint dans le channel ${channelName}`, channelName);
         },
         "/quit": (args) => {
+            const channelName = args[0] || currentChannel;
+            sendMessage(`il a quitté le channel >${channelName}`, channelName);
             setCurrentChannel("general");
-            executeCommand(`/quit ${args[0]}`);
-            addMessage(`Command executed: /quit ${args[0]}`);
+            executeCommand(`/quit ${channelName}`);
         },
+
         "/users": (args) => {
             executeCommand(`/users ${args[0] || currentChannel}`);
             addMessage(`Command executed: /users ${args[0] || currentChannel}`);
