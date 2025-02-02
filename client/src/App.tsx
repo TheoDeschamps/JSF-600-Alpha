@@ -7,6 +7,9 @@ function App() {
     const [messages, setMessages] = useState<string[]>([]);
     const [isTextarea, setIsTextarea] = useState(false);
     const [currentChannel, setCurrentChannel] = useState("general");
+    const [nickname, setNickname] = useState("");
+    const [isConnected, setIsConnected] = useState(false);
+    const [nickError, setNickError] = useState("");
 
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +90,28 @@ function App() {
 
             // socket.off("messages");
             // socket.off("chat message");
+        };
+    }, []);
+
+    // Écoute de la validation du nickname
+    useEffect(() => {
+        socket.on("nick_success", (message) => {
+            // Extraire le nickname du message "Your nickname has been set to: <nickname>"
+            const nickname = message.split(": ")[1];
+            setNickname(nickname);
+            setIsConnected(true);
+            setNickError("");
+            setMessages(prev => [...prev, message]);
+        });
+
+        socket.on("error", (error) => {
+            setNickError(error);
+            setIsConnected(false);
+        });
+
+        return () => {
+            socket.off("nick_success");
+            socket.off("error");
         };
     }, []);
 
@@ -176,38 +201,84 @@ function App() {
         }
     };
 
+    const handleNicknameSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const nick = message.trim();
+        if (!nick) {
+            setNickError("Le nickname ne peut pas être vide");
+            return;
+        }
+        socket.emit("nick", nick);
+        
+        const timeout = setTimeout(() => {
+            if (!isConnected) {
+                setNickError("Erreur de connexion : aucune réponse du serveur");
+            }
+        }, 5000);
+        
+        setMessage("");
+        
+        return () => clearTimeout(timeout);
+    };
+
     return (
         <div className="globalAppDiv">
             <h1>Chat Application</h1>
-            <div className="container">
-                <ul>
-                    {messages.map((msg, index) => (
-                        <li key={index}>{msg}</li>
-                    ))}
-                </ul>
+            {!isConnected ? (
+                <div className="login-container">
+                    <h2>Choisissez votre pseudo</h2>
+                    {nickError && <p className="error">{nickError}</p>}
+                    <form onSubmit={handleNicknameSubmit}>
+                        <div className="nickname-input-container">
+                            <span className="command-prefix">/nick </span>
+                            <input
+                                type="text"
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                placeholder="Entrez votre pseudo..."
+                                autoFocus
+                                disabled={nickError !== ""}
+                            />
+                        </div>
+                        <button 
+                            type="submit" 
+                            disabled={nickError !== ""}
+                        >
+                            {nickError ? "Erreur..." : "Connexion"}
+                        </button>
+                    </form>
+                </div>
+            ) : (
+                <div className="container">
+                    <ul>
+                        {messages.map((msg, index) => (
+                            <li key={index}>{msg}</li>
+                        ))}
+                    </ul>
 
-                <form className="messageSendDiv" onSubmit={handleSendMessage}>
-                    {isTextarea ? (
-                        <textarea
-                            ref={textAreaRef}
-                            value={message}
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            rows={3}
-                            placeholder="Type a message or command..."
-                        />
-                    ) : (
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={message}
-                            onChange={handleInputChange}
-                            placeholder="Type a message or command..."
-                        />
-                    )}
-                    <button type="submit">Send</button>
-                </form>
-            </div>
+                    <form className="messageSendDiv" onSubmit={handleSendMessage}>
+                        {isTextarea ? (
+                            <textarea
+                                ref={textAreaRef}
+                                value={message}
+                                onChange={handleInputChange}
+                                onKeyDown={handleKeyDown}
+                                rows={3}
+                                placeholder="Type a message or command..."
+                            />
+                        ) : (
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={message}
+                                onChange={handleInputChange}
+                                placeholder="Type a message or command..."
+                            />
+                        )}
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
+            )}
         </div>
     );
 }

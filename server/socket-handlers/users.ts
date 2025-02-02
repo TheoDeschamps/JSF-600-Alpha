@@ -51,6 +51,8 @@ export default function registerUserHandlers(io: Server, socket: Socket) {
             );
             nicknames.set(socket.id, nickname);
             socket.emit('nick_success', `Your nickname has been set to: ${nickname}`);
+            socket.join('general');
+            io.to('general').emit('user_joined', `${nickname} joined general`);
         } catch (err) {
             socket.emit('error', 'Failed to save nickname');
         }
