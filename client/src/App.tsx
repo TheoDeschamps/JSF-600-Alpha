@@ -4,7 +4,7 @@ import "./App.css";
 
 function App() {
     const [message, setMessage] = useState("");
-    const [messages, setMessages] = useState<string[]>([]);
+    const [messages, setMessages] = useState<{[channel: string]: string[]}>({});
     const [notifications, setNotifications] = useState<{[channel: string]: string[]}>({});
     const [isTextarea, setIsTextarea] = useState(false);
     const [currentChannel, setCurrentChannel] = useState("");
@@ -39,35 +39,56 @@ function App() {
     useEffect(() => {
         // -- Nouveaux events envoyés par le serveur (par le code HTML de ton collègue) --
         socket.on("new_message", (data) => {
-            setMessages((prev) => [...prev, `${data.nickname}: ${data.content}`]);
+            setMessages((prev) => ({
+                ...prev,
+                [data.channel]: Array.isArray(prev[data.channel])
+                    ? [...prev[data.channel], `${data.nickname}: ${data.content}`]
+                    : [`${data.nickname}: ${data.content}`]
+            }));
         });
 
         socket.on("private_message", (data) => {
-            setMessages((prev) => [...prev, `Private from ${data.from}: ${data.content}`]);
+            const privateChannel = `private-${data.from}`;
+            setMessages((prev) => ({
+                ...prev,
+                [privateChannel]: Array.isArray(prev[privateChannel])
+                    ? [...prev[privateChannel], `Private from ${data.from}: ${data.content}`]
+                    : [`Private from ${data.from}: ${data.content}`]
+            }));
         });
 
         socket.on("channel_messages", (msgs) => {
             // On reçoit un tableau de messages
-            msgs.forEach((msg: any) => {
-                setMessages((prev) => [...prev, `${msg.nickname}: ${msg.content}`]);
-            });
+            const channelMessages = msgs.map((msg: any) => `${msg.nickname}: ${msg.content}`);
+            setMessages((prev) => ({
+                ...prev,
+                [currentChannel]: channelMessages
+            }));
         });
 
         socket.on("channels_list", (channels) => {
             if (channels.length > 0) {
-                setMessages((prev) => [
+                setMessages((prev) => ({
                     ...prev,
-                    "Available channels:",
-                    ...channels.map((c: string) => `- ${c}`),
-                ]);
+                    system: [
+                        "Available channels:",
+                        ...channels.map((c: string) => `- ${c}`)
+                    ]
+                }));
             } else {
-                setMessages((prev) => [...prev, "No channels available."]);
+                setMessages((prev) => ({
+                    ...prev,
+                    system: ["No channels available."]
+                }));
             }
         });
 
         // -- Gestion d'erreur générique --
         socket.on("error", (err) => {
-            setMessages((prev) => [...prev, `Error: ${err}`]);
+            setMessages((prev) => ({
+                ...prev,
+                system: [...(prev.system || []), `Error: ${err}`]
+            }));
         });
 
         // Écouter les événements de channel
@@ -116,7 +137,7 @@ function App() {
             socket.off("user_joined");
             socket.off("user_left");
         };
-    }, [joinedChannels]);
+    }, [currentChannel, joinedChannels]);
 
     // Écoute de la validation du nickname
     useEffect(() => {
@@ -165,6 +186,11 @@ function App() {
                 delete newNotifications[channelToQuit];
                 return newNotifications;
             });
+            setMessages(prev => {
+                const newMessages = { ...prev };
+                delete newMessages[channelToQuit];
+                return newMessages;
+            });
             socket.emit("message", { content: `/quit ${channelToQuit}` });
         },
         "/users": (args) => {
@@ -202,7 +228,10 @@ function App() {
         if (!trimmedMessage) return;
 
         if (!trimmedMessage.startsWith("/") && (!currentChannel || !joinedChannels.includes(currentChannel))) {
-            setMessages(prev => [...prev, "Error: You must first join or create a channel using /create or /join"]);
+            setMessages(prev => ({
+                ...prev,
+                system: [...(prev.system || []), "Error: You must first join or create a channel using /create or /join"]
+            }));
             return;
         }
 
@@ -211,11 +240,17 @@ function App() {
             if (commands[command]) {
                 commands[command](args);
             } else {
-                setMessages((prev) => [...prev, `Unknown command: ${command}`]);
+                setMessages(prev => ({
+                    ...prev,
+                    system: [...(prev.system || []), `Unknown command: ${command}`]
+                }));
             }
         } else {
             if (!currentChannel) {
-                setMessages(prev => [...prev, "Error: You must be in a channel to send messages"]);
+                setMessages(prev => ({
+                    ...prev,
+                    system: [...(prev.system || []), "Error: You must be in a channel to send messages"]
+                }));
                 return;
             }
             socket.emit("message", {
@@ -295,9 +330,9 @@ function App() {
                     )}
                     <ul>
                         {[
-                            ...messages,
+                            ...(messages[currentChannel] || []),
                             ...(notifications[currentChannel] || []),
-                            ...(notifications.system || []) // Toujours afficher les notifications système
+                            ...(notifications.system || [])
                         ].map((msg, index) => (
                             <li 
                                 key={index} 
