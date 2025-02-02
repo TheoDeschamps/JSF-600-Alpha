@@ -31,81 +31,6 @@ export default function registerUserHandlers(io: Server, socket: Socket) {
         }
     });
 
-    // Vérifier si un pseudo existe déjà
-    socket.on('check_nickname', async (nickname: string) => {
-        console.log('Tentative de connexion avec le pseudo:', nickname);
-        try {
-            // Vérifier si le pseudo existe dans la base de données
-            const existingUser = await Nickname.findOne({ nickname });
-            console.log('Utilisateur trouvé dans la DB:', existingUser);
-            
-            if (!existingUser) {
-                socket.emit('error', 'Ce pseudo n\'existe pas. Veuillez le créer d\'abord.');
-                return;
-            }
-            
-            // Vérifier si l'utilisateur est déjà connecté
-            const connectedUser = await Nickname.findOne({ 
-                nickname,
-                isConnected: true
-            });
-            
-            if (connectedUser && connectedUser.socketId !== socket.id) {
-                socket.emit('error', 'Ce pseudo est déjà connecté');
-                return;
-            }
-
-            // Mettre à jour l'utilisateur avec le nouveau socketId
-            const updatedUser = await Nickname.findOneAndUpdate(
-                { nickname },
-                { 
-                    socketId: socket.id,
-                    isConnected: true,
-                    lastDisconnect: null
-                },
-                { new: true }
-            );
-            console.log('Utilisateur mis à jour:', updatedUser);
-            
-            nicknames.set(socket.id, nickname);
-
-            // Rejoindre tous les channels précédemment rejoints
-            if (updatedUser.channels && updatedUser.channels.length > 0) {
-                for (const channel of updatedUser.channels) {
-                    socket.join(channel);
-                    io.to(channel).emit('user_joined', `${nickname} joined ${channel}`);
-                }
-            } else {
-                socket.join('general');
-                io.to('general').emit('user_joined', `${nickname} joined general`);
-            }
-
-            // Envoyer toutes les informations nécessaires au client
-            const userInfo = {
-                nickname,
-                message: `Connecté en tant que ${nickname}`,
-                channels: updatedUser.channels || ['general'],
-                currentChannel: updatedUser.channels?.[0] || 'general'
-            };
-            console.log('Informations envoyées au client:', userInfo);
-            socket.emit('check_nickname_success', userInfo);
-
-            // Envoyer l'historique des messages pour chaque channel
-            for (const channel of updatedUser.channels || ['general']) {
-                const messages = await Message.find({ channel })
-                    .sort({ createdAt: 1 })
-                    .limit(100)
-                    .exec();
-                console.log(`Messages trouvés pour ${channel}:`, messages.length);
-                socket.emit('channel_messages', messages);
-            }
-
-        } catch (err) {
-            console.error('Error checking nickname:', err);
-            socket.emit('error', 'Failed to check nickname');
-        }
-    });
-
     // Définir ou mettre à jour le pseudonyme d'un utilisateur
     socket.on('nick', async (nickname: string) => {
         if (!nickname || nickname.trim() === '') {
@@ -119,49 +44,23 @@ export default function registerUserHandlers(io: Server, socket: Socket) {
         }
 
         try {
-            // Vérifier si le pseudo existe déjà dans la base de données
-            const existingUser = await Nickname.findOne({ nickname });
-            if (existingUser) {
-                socket.emit('error', 'Ce pseudo existe déjà. Utilisez la connexion.');
-                return;
-            }
-
             await Nickname.findOneAndUpdate(
                 { socketId: socket.id },
                 { nickname },
                 { upsert: true, new: true }
             );
-            
             nicknames.set(socket.id, nickname);
             socket.emit('nick_success', `Your nickname has been set to: ${nickname}`);
-            socket.join('general');
-            io.to('general').emit('user_joined', `${nickname} joined general`);
         } catch (err) {
             socket.emit('error', 'Failed to save nickname');
         }
     });
 
     // Gérer la déconnexion d'un utilisateur
-    socket.on('disconnect', async () => {
-        const nickname = nicknames.get(socket.id);
-        if (!nickname) return; // Si pas de nickname, on ne fait rien
-
-        try {
-            // Sauvegarder l'état de l'utilisateur avant la déconnexion
-            await Nickname.findOneAndUpdate(
-                { nickname },
-                { 
-                    $set: { 
-                        isConnected: false,
-                        lastDisconnect: new Date()
-                    }
-                }
-            );
-            nicknames.delete(socket.id);
-            console.log(`User disconnected: ${nickname} (ID: ${socket.id})`);
-        } catch (err) {
-            console.error('Error updating user disconnect status:', err);
-        }
+    socket.on('disconnect', () => {
+        const nickname = nicknames.get(socket.id) || 'Anonymous';
+        nicknames.delete(socket.id);
+        console.log(`User disconnected: ${nickname} (ID: ${socket.id})`);
     });
 }
 

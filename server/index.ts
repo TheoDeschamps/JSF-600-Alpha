@@ -3,7 +3,6 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import mongoose from 'mongoose';
 import Message from './models/message.js';
-import Nickname from './models/nickname.js';
 
 import registerChannelHandlers from './socket-handlers/channels.js';
 import registerUserHandlers from './socket-handlers/users.js';
@@ -12,17 +11,11 @@ import registerMessageHandlers from './socket-handlers/messages.js';
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: "http://localhost:3000",
-        methods: ["GET", "POST"]
-    }
+    cors: { origin: '*' },
 });
-
 
 // Connexion MongoDB
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/chatDB';
-await mongoose.connect(MONGO_URI, {
-});
+await mongoose.connect('mongodb://127.0.0.1:27017/chatDB');
 
 
 // Configurer Express pour servir les fichiers statiques
@@ -34,23 +27,8 @@ app.use(express.static('public'));
 });*/
 
 // Charger les gestionnaires Socket.IO
-io.on('connection', async (socket) => {
-    // Vérifier si le socket est déjà associé à un utilisateur connecté
-    const existingUser = await Nickname.findOne({ 
-        socketId: socket.id,
-        isConnected: true 
-    });
-    
-    if (existingUser) {
-        // Si oui, on met à jour son statut
-        await Nickname.findOneAndUpdate(
-            { socketId: socket.id },
-            { 
-                isConnected: false,
-                lastDisconnect: new Date()
-            }
-        );
-    }
+io.on('connection', (socket) => {
+    console.log(`User connected: ${socket.id}`);
 
     registerUserHandlers(io, socket);
     registerMessageHandlers(io, socket);
@@ -62,13 +40,14 @@ io.on('connection', async (socket) => {
     socket.on('quit_channel', (channelName) => registerChannelHandlers.quitChannel(io, socket, channelName));
     socket.on('delete_channel', (channelName) => registerChannelHandlers.deleteChannel(io, socket, channelName));
 
+    // Déconnexion
     socket.on('disconnect', () => {
-        // La déconnexion est déjà gérée dans registerUserHandlers
+        console.log(`User disconnected: ${socket.id}`);
     });
 });
 
 // Lancer le serveur
-const PORT = process.env.PORT || 8000;
+const PORT = 8000;
 server.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
