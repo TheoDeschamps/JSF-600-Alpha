@@ -214,7 +214,9 @@ function App() {
         "/create": (args) => {
             socket.emit("message", { content: `/create ${args[0]}` });
         },
-        "/list": (args) => socket.emit("message", { content: `/list ${args[0] || ""}` }),
+        "/list": () => {
+            socket.emit("message", { content: "/list", channel: currentChannel });
+        },
         "/delete": (args) => socket.emit("message", { content: `/delete ${args[0]}` }),
         "/join": (args) => {
             setCurrentChannel(args[0]);
@@ -224,24 +226,37 @@ function App() {
             const channelToQuit = args[0] || currentChannel;
             setJoinedChannels(prev => prev.filter(ch => ch !== channelToQuit));
             setCurrentChannel("");
-            setNotifications(prev => {
-                const newNotifications = { ...prev };
-                delete newNotifications[channelToQuit];
-                return newNotifications;
-            });
-            setMessages(prev => {
-                const newMessages = { ...prev };
-                delete newMessages[channelToQuit];
-                return newMessages;
-            });
             socket.emit("message", { content: `/quit ${channelToQuit}` });
         },
-        "/users": (args) => {
-            socket.emit("message", { content: `/users ${args[0] || currentChannel}` });
+        "/users": () => {
+            socket.emit("message", { content: `/users ${currentChannel}`, channel: currentChannel });
         },
         "/msg": (args) => {
-            const [toNickname, ...rest] = args;
-            socket.emit("message", { content: `/msg ${toNickname} ${rest.join(" ")}` });
+            if (args.length < 2) {
+                setNotifications(prev => ({
+                    ...prev,
+                    system: [...(prev.system || []), 'Usage: /msg <nickname> <message>']
+                }));
+                return;
+            }
+            const [toNickname, ...messageWords] = args;
+            socket.emit("message", { 
+                content: `/msg ${toNickname} ${messageWords.join(" ")}`,
+                channel: currentChannel 
+            });
+        },
+        "/rename": (args) => {
+            if (args.length !== 2) {
+                setNotifications(prev => ({
+                    ...prev,
+                    system: [...(prev.system || []), 'Usage: /rename <old_channel> <new_channel>']
+                }));
+                return;
+            }
+            socket.emit("message", { 
+                content: `/rename ${args[0]} ${args[1]}`,
+                channel: currentChannel 
+            });
         },
     };
 
@@ -351,6 +366,54 @@ function App() {
         // Charger les messages si nécessaire
         socket.emit('messages', channelName);
     };
+
+    // Ajouter les écouteurs pour les réponses aux commandes
+    useEffect(() => {
+        socket.on('channels_list', (channels) => {
+            setNotifications(prev => ({
+                ...prev,
+                system: [
+                    'Channels disponibles:',
+                    ...channels.map((c: string) => `- ${c}`)
+                ]
+            }));
+        });
+
+        socket.on('users_list', (users) => {
+            interface UserStatus {
+                nickname: string;
+                isConnected: boolean;
+            }
+            setNotifications(prev => ({
+                ...prev,
+                system: [
+                    'Utilisateurs dans le channel:',
+                    ...users.map((user: UserStatus) => 
+                        `- ${user.nickname} ${user.isConnected ? '(connecté)' : '(déconnecté)'}`
+                    )
+                ]
+            }));
+        });
+
+        socket.on('channel_renamed', ({ oldName, newName }) => {
+            setNotifications(prev => ({
+                ...prev,
+                system: [`Channel ${oldName} renommé en ${newName}`]
+            }));
+            if (currentChannel === oldName) {
+                setCurrentChannel(newName);
+            }
+            setJoinedChannels(prev => 
+                prev.map(ch => ch === oldName ? newName : ch)
+            );
+        });
+
+        return () => {
+            socket.off('channels_list');
+            socket.off('users_list');
+            socket.off('channel_renamed');
+        };
+    }, [currentChannel]);
 
     return (
         <div className="globalAppDiv">
