@@ -21,8 +21,12 @@ export async function createChannel(io: Server, socket: Socket, channelName: str
         const channel = new Channel({ name: channelName });
         await channel.save();
 
+        // Rejoindre automatiquement le channel après sa création
         socket.join(channelName);
+        const nickname = nicknames.get(socket.id);
+        io.to(channelName).emit('user_joined', `${nickname} joined ${channelName}`);
         io.emit('channel_created', channelName);
+
     } catch (err) {
         console.error('Error creating channel:', err);
         socket.emit('error', 'Failed to create channel');

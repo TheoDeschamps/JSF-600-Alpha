@@ -9,6 +9,7 @@
   --color-shadow: #cbced1;
   --color-shadow-light: #fff;
   --color-placeholder: gray;
+  --color-text: #333;
 
   --radius-lg: 20px;
   --radius-md: 10px;
@@ -77,6 +78,9 @@ body {
 }
 
 .container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
   width: 90%;
   min-height: 80%;
   padding: var(--spacing-md);
@@ -148,4 +152,173 @@ li {
 
 li:last-child {
   margin-bottom: 24px;
+}
+
+.login-container {
+    max-width: 400px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: var(--color-background-secondary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--box-shadow-lg);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.toggle-login {
+    background: transparent;
+    color: var(--color-primary);
+    box-shadow: none;
+    font-size: 0.9em;
+    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.toggle-login:hover {
+    background: transparent;
+    color: var(--color-primary-hover);
+}
+
+.login-container h2 {
+    margin-bottom: 1rem;
+    text-align: center;
+    color: var(--color-primary);
+    font-weight: 900;
+}
+
+.login-container form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.nickname-input-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--color-background);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--box-shadow-inset-md);
+    padding-left: 20px;
+    margin-bottom: 1rem;
+}
+
+.command-prefix {
+    color: var(--color-primary);
+    font-weight: bold;
+    margin-right: 8px;
+    font-size: 1.1em;
+    user-select: none;
+}
+
+.nickname-input-container input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 15px 0;
+    font-size: 1.1em;
+}
+
+.login-container button {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.1em;
+}
+
+.error {
+    color: #ff4444;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-weight: bold;
+    padding: 10px;
+    background: rgba(255, 68, 68, 0.1);
+    border-radius: var(--radius-md);
+}
+
+.login-container button:disabled,
+.login-container input:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.login-container button:disabled {
+    background: var(--color-shadow);
+}
+
+.warning {
+    color: #ff4444;
+    text-align: center;
+    padding: 10px;
+    background: rgba(255, 68, 68, 0.1);
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+.message {
+    color: var(--color-text);
+}
+
+.notification {
+    font-style: italic;
+    color: var(--color-primary);
+    background: rgba(29, 161, 242, 0.1);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    margin: 4px 0;
+}
+
+.sidebar {
+    width: 250px;
+    background-color: #2f3136;
+    padding: 20px;
+    color: #ffffff;
+    border-right: 1px solid #202225;
+}
+
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.channels-section,
+.private-channels-section {
+    margin-bottom: 30px;
+}
+
+.channels-section h3,
+.private-channels-section h3 {
+    color: #8e9297;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.channels-list {
+    list-style: none;
+    padding: 0;
+}
+
+.channels-list li {
+    padding: 8px 12px;
+    margin: 2px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.channels-list li:hover {
+    background-color: #36393f;
+}
+
+.channels-list li.active {
+    background-color: #393c43;
+    color: #fff;
 }
