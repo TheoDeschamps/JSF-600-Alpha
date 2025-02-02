@@ -1,63 +1,95 @@
 import { useEffect, useState } from "react";
 import { socket } from "../index";
 
-type Message = string;
-
-interface UseChatReturn {
-    messages: Message[];
-    sendMessage: (message: string) => void;
-    executeCommand: (commandLine: string) => void;
-    currentChannel: string;
-    setCurrentChannel: React.Dispatch<React.SetStateAction<string>>;
+interface ChatMessage {
+    channel: string;
+    nickname?: string;
+    content: string;
 }
 
-export function useChat(): UseChatReturn {
-    const [messages, setMessages] = useState<Message[]>([]);
+type ChannelMessages = Record<string, ChatMessage[]>;
+type Message = string;
+
+export function useChat() {
+    const [channelMessages, setChannelMessages] = useState<ChannelMessages>({});
     const [currentChannel, setCurrentChannel] = useState("general");
+    const [channels, setChannels] = useState<string[]>([]);
+    function addChatMessage(
+        channel: string,
+        nickname: string | undefined,
+        content: string
+    ) {
+        setChannelMessages((prev) => {
+            const oldList = prev[channel] || [];
+            const newMessage: ChatMessage = {
+                channel,
+                nickname,
+                content,
+            };
+            return {
+                ...prev,
+                [channel]: [...oldList, newMessage],
+            };
+        });
+    }
 
     useEffect(() => {
         socket.on("new_message", (data) => {
-            setMessages((prev) => [...prev, `${data.nickname}: ${data.content}`]);
+            addChatMessage(data.channel, data.nickname, data.content);
         });
 
         socket.on("private_message", (data) => {
-            setMessages((prev) => [...prev, `Private from ${data.from}: ${data.content}`]);
+            addChatMessage("private", data.from, data.content);
         });
 
         socket.on("channel_messages", (msgs) => {
-            msgs.forEach((msg: any) => {
-                setMessages((prev) => [...prev, `${msg.nickname}: ${msg.content}`]);
+            if (!msgs || msgs.length === 0) return;
+            const channelName = msgs[0].channel || currentChannel;
+
+            setChannelMessages((prev) => {
+                const replacedList = msgs.map((msg: any) => ({
+                    channel: channelName,
+                    nickname: msg.nickname,
+                    content: msg.content,
+                }));
+
+                return {
+                    ...prev,
+                    [channelName]: replacedList,
+                };
             });
         });
 
-        socket.on("channels_list", (channels) => {
-            if (channels.length > 0) {
-                setMessages((prev) => [
-                    ...prev,
-                    "Available channels:",
-                    ...channels.map((c: string) => `- ${c}`)
-                ]);
+        socket.on("channels_list", (channelList: string[]) => {
+            if (channelList.length > 0) {
+                addChatMessage(
+                    currentChannel,
+                    "SYSTEM",
+                    "Available channels:\n" + channelList.map((c) => `- ${c}`).join("\n")
+                );
             } else {
-                setMessages((prev) => [...prev, "No channels available."]);
+                addChatMessage(currentChannel, "SYSTEM", "No channels available.");
             }
+            setChannels(channelList);
         });
 
         socket.on("users_list", (userList) => {
             if (userList.length > 0) {
-                setMessages((prev) => [...prev, "Users in the channel:"]);
+                addChatMessage(currentChannel, "SYSTEM", "Users in the channel:");
                 userList.forEach((user: any) => {
-                    setMessages((prev) => [
-                        ...prev,
+                    addChatMessage(
+                        currentChannel,
+                        "SYSTEM",
                         `- ${user.nickname} (${user.isConnected ? "online" : "offline"})`
-                    ]);
+                    );
                 });
             } else {
-                setMessages((prev) => [...prev, "No users in the channel."]);
+                addChatMessage(currentChannel, "SYSTEM", "No users in the channel.");
             }
         });
 
         socket.on("error", (err) => {
-            setMessages((prev) => [...prev, `Error: ${err}`]);
+            addChatMessage(currentChannel, "SYSTEM", `Error: ${err}`);
         });
 
         return () => {
@@ -68,11 +100,12 @@ export function useChat(): UseChatReturn {
             socket.off("users_list");
             socket.off("error");
         };
-    }, []);
+    }, [currentChannel]);
 
     function sendMessage(content: string, channelOverride?: string) {
+        const channel = channelOverride ?? currentChannel;
         socket.emit("message", {
-            channel: channelOverride ?? currentChannel,
+            channel,
             content,
         });
     }
@@ -81,11 +114,23 @@ export function useChat(): UseChatReturn {
         socket.emit("message", { content: commandLine });
     }
 
+    const messagesForCurrentChannel = channelMessages[currentChannel] || [];
+    const messagesAsStrings: string[] = messagesForCurrentChannel.map((msg) => {
+        if (msg.nickname && msg.nickname !== "SYSTEM") {
+            return `${msg.nickname}: ${msg.content}`;
+        } else if (msg.nickname === "SYSTEM") {
+            return `[SYSTEM] ${msg.content}`;
+        } else {
+            return msg.content;
+        }
+    });
+
     return {
-        messages,
+        messages: messagesAsStrings,
         sendMessage,
         executeCommand,
         currentChannel,
-        setCurrentChannel
+        setCurrentChannel,
+        channels,
     };
 }

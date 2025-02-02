@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import { useChat } from "./hooks/useSocket";
 import { createCommands } from "./utils/commands";
 import { MessageList } from "./components/MessageList";
 import { MessageInput } from "./components/MessageInput";
+import { ChannelList } from "./components/ChannelList";
 import "./App.css";
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         executeCommand,
         currentChannel,
         setCurrentChannel,
+        channels,
     } = useChat();
 
     const [message, setMessage] = useState("");
@@ -28,8 +30,20 @@ function App() {
         sendMessage
     );
 
+    useEffect(() => {
+        handleSendMessage("/list");
+    }, []);
 
-    
+    function handleJoinChannel(channel: string) {
+        const cmdLine = `/join ${channel}`;
+        const [command, ...args] = cmdLine.split(" ");
+        if (commands[command]) {
+            commands[command](args);
+        } else {
+            sendMessage(`Unknown command: ${command}`);
+        }
+    }
+
     const handleSendMessage = (text: string) => {
         
         if (text.startsWith("/")) {
@@ -61,15 +75,20 @@ function App() {
     return (
         <div className="globalAppDiv">
             <h1>Chat Application</h1>
-            <div className="container">
-                <MessageList messages={messages} />
+            <div className="container" style={{ display: "flex" }}>
+                <div style={{ marginRight: "20px", width: "200px" }}>
+                    <ChannelList channels={channels} onJoinChannel={handleJoinChannel} />
+                </div>
+                <div style={{ flex: 1 }}>
+                    <MessageList messages={messages} />
 
-                <MessageInput
-                    message={message}
-                    onMessageChange={handleTextareaToggle}
-                    isTextarea={isTextarea}
-                    onSendMessage={handleSendMessage}
-                />
+                    <MessageInput
+                        message={message}
+                        onMessageChange={handleTextareaToggle}
+                        isTextarea={isTextarea}
+                        onSendMessage={handleSendMessage}
+                    />
+                </div>
             </div>
         </div>
     );
