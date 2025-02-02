@@ -19,7 +19,10 @@ export default function registerMessageHandlers(io: Server, socket: Socket) {
             }
 
             // Récupération du pseudonyme
-            const nickname = nicknames.get(socket.id) || 'Anonymous';
+            const nickname = nicknames.get(socket.id);
+            if (!nickname) {
+                return;
+            }
 
             try {
                 // Sauvegarder le message dans MongoDB
@@ -40,7 +43,7 @@ export default function registerMessageHandlers(io: Server, socket: Socket) {
         }
     });
 
-    // Gestion de la récupération de l’historique des messages
+    // Gestion de la récupération de l'historique des messages
     socket.on('messages', async (channelName) => {
         if (!channelName || channelName.trim() === '') {
             socket.emit('error', 'Channel name cannot be empty');
@@ -52,7 +55,7 @@ export default function registerMessageHandlers(io: Server, socket: Socket) {
                 .sort({ createdAt: 1 }) // Trier les messages par date croissante
                 .exec();
 
-            socket.emit('channel_messages', messages); // Envoyer l’historique au client
+            socket.emit('channel_messages', messages); // Envoyer l'historique au client
         } catch (error) {
             console.error('Error retrieving messages:', error);
             socket.emit('error', 'Failed to retrieve messages');

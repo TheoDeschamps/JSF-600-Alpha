@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { socket } from "./index";
 import "./App.css";
 
+// Ajouter cette interface en haut du fichier, après les imports
+interface ChatMessage {
+    nickname: string;
+    content: string;
+    channel: string;
+    createdAt?: Date;
+}
+
 function App() {
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState<{[channel: string]: string[]}>({});
@@ -11,6 +19,7 @@ function App() {
     const [nickname, setNickname] = useState("");
     const [isConnected, setIsConnected] = useState(false);
     const [nickError, setNickError] = useState("");
+    const [isLogin, setIsLogin] = useState(false);
     const [joinedChannels, setJoinedChannels] = useState<string[]>([]);
 
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -57,9 +66,9 @@ function App() {
             }));
         });
 
-        socket.on("channel_messages", (msgs) => {
+        socket.on("channel_messages", (msgs: ChatMessage[]) => {
             // On reçoit un tableau de messages
-            const channelMessages = msgs.map((msg: any) => `${msg.nickname}: ${msg.content}`);
+            const channelMessages = msgs.map((msg: ChatMessage) => `${msg.nickname}: ${msg.content}`);
             setMessages((prev) => ({
                 ...prev,
                 [currentChannel]: channelMessages
@@ -152,13 +161,43 @@ function App() {
             }));
         });
 
+        socket.on("check_nickname_success", (data) => {
+            console.log('Réception check_nickname_success:', data);
+            setNickname(data.nickname);
+            setIsConnected(true);
+            setNickError("");
+            setJoinedChannels(data.channels);
+            setCurrentChannel(data.currentChannel);
+            setNotifications(prev => ({
+                ...prev,
+                system: Array.isArray(prev.system) 
+                    ? [...prev.system, `Connecté en tant que ${data.nickname}`] 
+                    : [`Connecté en tant que ${data.nickname}`]
+            }));
+        });
+
         socket.on("error", (error) => {
             setNickError(error);
             setIsConnected(false);
         });
 
+        socket.on("channel_messages", (messages) => {
+            console.log('Réception messages:', messages);
+            if (messages.length > 0) {
+                const channelName = messages[0].channel;
+                const formattedMessages = messages.map(
+                    (msg: ChatMessage) => `${msg.nickname}: ${msg.content}`
+                );
+                setMessages(prev => ({
+                    ...prev,
+                    [channelName]: formattedMessages
+                }));
+            }
+        });
+
         return () => {
             socket.off("nick_success");
+            socket.off("check_nickname_success");
             socket.off("error");
         };
     }, []);
@@ -276,12 +315,21 @@ function App() {
 
     const handleNicknameSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const nick = message.trim();
+        const nick = isLogin ? message.trim() : message.trim().replace('/nick ', '');
+        
+        console.log('Mode:', isLogin ? 'connexion' : 'création');
+        console.log('Pseudo:', nick);
+
         if (!nick) {
             setNickError("Le nickname ne peut pas être vide");
             return;
         }
-        socket.emit("nick", nick);
+
+        if (isLogin) {
+            socket.emit('check_nickname', nick);
+        } else {
+            socket.emit('message', { content: `/nick ${nick}` });
+        }
         
         const timeout = setTimeout(() => {
             if (!isConnected) {
@@ -290,7 +338,6 @@ function App() {
         }, 5000);
         
         setMessage("");
-        
         return () => clearTimeout(timeout);
     };
 
@@ -299,16 +346,28 @@ function App() {
             <h1>Chat Application</h1>
             {!isConnected ? (
                 <div className="login-container">
-                    <h2>Choisissez votre pseudo</h2>
+                    <div className="login-header">
+                        <h2>{isLogin ? "Connexion" : "Créer un pseudo"}</h2>
+                        <button 
+                            className="toggle-login" 
+                            onClick={() => {
+                                setIsLogin(!isLogin);
+                                setNickError("");
+                                setMessage("");
+                            }}
+                        >
+                            {isLogin ? "Créer un nouveau pseudo" : "Déjà un pseudo ?"}
+                        </button>
+                    </div>
                     {nickError && <p className="error">{nickError}</p>}
                     <form onSubmit={handleNicknameSubmit}>
                         <div className="nickname-input-container">
-                            <span className="command-prefix">/nick </span>
+                            {!isLogin && <span className="command-prefix">/nick </span>}
                             <input
                                 type="text"
                                 value={message}
                                 onChange={(e) => setMessage(e.target.value)}
-                                placeholder="Entrez votre pseudo..."
+                                placeholder={isLogin ? "Entrez votre pseudo existant..." : "Choisissez un pseudo..."}
                                 autoFocus
                                 disabled={nickError !== ""}
                             />
@@ -317,7 +376,7 @@ function App() {
                             type="submit" 
                             disabled={nickError !== ""}
                         >
-                            {nickError ? "Erreur..." : "Connexion"}
+                            {nickError ? "Erreur..." : (isLogin ? "Se connecter" : "Créer")}
                         </button>
                     </form>
                 </div>

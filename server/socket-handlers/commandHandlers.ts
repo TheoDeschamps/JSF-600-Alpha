@@ -7,8 +7,40 @@ import Nickname from '../models/nickname.js';
 // Fonction principale pour traiter les commandes
 export function handleCommand(io: Server, socket: Socket, command: string, args: string[]) {
     const commands: Record<string, Function> = {
-        //fonctionne correctement
-        '/nick': (io: Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, nickname: string) => handleNick(io, socket, nickname),
+        '/nick': async (io: Server, socket: Socket, nickname: string) => {
+            if (!nickname || nickname.trim() === '') {
+                socket.emit('error', 'Nickname cannot be empty');
+                return;
+            }
+
+            if ([...nicknames.values()].includes(nickname)) {
+                socket.emit('error', 'Nickname is already in use');
+                return;
+            }
+
+            try {
+                // Vérifier si le pseudo existe déjà dans la base de données
+                const existingUser = await Nickname.findOne({ nickname });
+                if (existingUser) {
+                    socket.emit('error', 'Ce pseudo existe déjà. Utilisez la connexion.');
+                    return;
+                }
+
+                await Nickname.findOneAndUpdate(
+                    { socketId: socket.id },
+                    { nickname },
+                    { upsert: true, new: true }
+                );
+                
+                nicknames.set(socket.id, nickname);
+                socket.emit('nick_success', `Your nickname has been set to: ${nickname}`);
+                socket.join('general');
+                io.to('general').emit('user_joined', `${nickname} joined general`);
+            } catch (err) {
+                console.error('Error saving nickname:', err);
+                socket.emit('error', 'Failed to save nickname');
+            }
+        },
         '/list': (io: Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, keyword = '') => registerChannelHandlers.listChannels(io, socket, keyword),
         '/create': (io: Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, channelName = '') => registerChannelHandlers.createChannel(io, socket, channelName),
         '/delete': (io: Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, channelName = '') => registerChannelHandlers.deleteChannel(io, socket, channelName),
@@ -41,25 +73,5 @@ export function handleCommand(io: Server, socket: Socket, command: string, args:
         }
     } else {
         socket.emit('error', `Unknown command: ${command}`);
-    }
-}
-
-// Gestion de `/nick`
-async function handleNick(io: Server, socket: Socket, nickname: string) {
-    if (!nickname || nickname.trim() === '') {
-        socket.emit('error', 'Nickname cannot be empty');
-        return;
-    }
-    try {
-        await Nickname.findOneAndUpdate(
-            { socketId: socket.id },
-            { nickname },
-            { upsert: true, new: true }
-        );
-        nicknames.set(socket.id, nickname);
-        socket.emit('nick_success', `Your nickname has been set to: ${nickname}`);
-    } catch (err) {
-        console.error('Error saving nickname:', err);
-        socket.emit('error', 'Failed to save nickname');
     }
 }
