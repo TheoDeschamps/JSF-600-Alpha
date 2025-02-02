@@ -61,14 +61,17 @@ export function useChat() {
         });
 
         socket.on("channels_list", (channelList: string[]) => {
-            if (channelList.length > 0) {
+            if (channelList.length > 0 && currentChannel !== "general") {
                 addChatMessage(
                     currentChannel,
                     "SYSTEM",
                     "Available channels:\n" + channelList.map((c) => `- ${c}`).join("\n")
                 );
-            } else {
+            } else if (currentChannel !== "general") {
                 addChatMessage(currentChannel, "SYSTEM", "No channels available.");
+            }
+            else if (currentChannel === "general") {
+                addChatMessage(currentChannel, "SYSTEM", "Welcome to the chat, please make a /nick to set your nickname if you haven't already.");
             }
             setChannels(channelList);
         });
