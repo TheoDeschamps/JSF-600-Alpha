@@ -5,6 +5,7 @@ import "./App.css";
 function App() {
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState<string[]>([]);
+    const [notifications, setNotifications] = useState<{[channel: string]: string[]}>({});
     const [isTextarea, setIsTextarea] = useState(false);
     const [currentChannel, setCurrentChannel] = useState("");
     const [nickname, setNickname] = useState("");
@@ -73,7 +74,12 @@ function App() {
         socket.on("channel_created", (channelName) => {
             setJoinedChannels(prev => [...prev, channelName]);
             setCurrentChannel(channelName);
-            setMessages(prev => [...prev, `Channel ${channelName} created and joined successfully`]);
+            setNotifications(prev => ({
+                ...prev,
+                [channelName]: Array.isArray(prev[channelName]) 
+                    ? [...prev[channelName], `Channel ${channelName} created and joined successfully`]
+                    : [`Channel ${channelName} created and joined successfully`]
+            }));
         });
 
         socket.on("user_joined", (message) => {
@@ -81,13 +87,23 @@ function App() {
             if (!joinedChannels.includes(channelName)) {
                 setJoinedChannels(prev => [...prev, channelName]);
             }
-            setMessages(prev => [...prev, message]);
+            setNotifications(prev => ({
+                ...prev,
+                [channelName]: Array.isArray(prev[channelName]) 
+                    ? [...prev[channelName], message]
+                    : [message]
+            }));
         });
 
         socket.on("user_left", (message) => {
             const channelName = message.split(" left ")[1];
             setJoinedChannels(prev => prev.filter(ch => ch !== channelName));
-            setMessages(prev => [...prev, message]);
+            setNotifications(prev => ({
+                ...prev,
+                [channelName]: Array.isArray(prev[channelName]) 
+                    ? [...prev[channelName], message]
+                    : [message]
+            }));
         });
 
         return () => {
@@ -105,12 +121,14 @@ function App() {
     // Écoute de la validation du nickname
     useEffect(() => {
         socket.on("nick_success", (message) => {
-            // Extraire le nickname du message "Your nickname has been set to: <nickname>"
             const nickname = message.split(": ")[1];
             setNickname(nickname);
             setIsConnected(true);
             setNickError("");
-            setMessages(prev => [...prev, message]);
+            setNotifications(prev => ({
+                ...prev,
+                system: Array.isArray(prev.system) ? [...prev.system, message] : [message]
+            }));
         });
 
         socket.on("error", (error) => {
@@ -142,6 +160,11 @@ function App() {
             const channelToQuit = args[0] || currentChannel;
             setJoinedChannels(prev => prev.filter(ch => ch !== channelToQuit));
             setCurrentChannel("");
+            setNotifications(prev => {
+                const newNotifications = { ...prev };
+                delete newNotifications[channelToQuit];
+                return newNotifications;
+            });
             socket.emit("message", { content: `/quit ${channelToQuit}` });
         },
         "/users": (args) => {
@@ -271,8 +294,22 @@ function App() {
                         <h2 className="warning">No channel joined. Use /create or /join to start chatting</h2>
                     )}
                     <ul>
-                        {messages.map((msg, index) => (
-                            <li key={index}>{msg}</li>
+                        {[
+                            ...messages,
+                            ...(notifications[currentChannel] || []),
+                            ...(notifications.system || []) // Toujours afficher les notifications système
+                        ].map((msg, index) => (
+                            <li 
+                                key={index} 
+                                className={
+                                    notifications[currentChannel]?.includes(msg) || 
+                                    notifications.system?.includes(msg)
+                                        ? 'notification' 
+                                        : 'message'
+                                }
+                            >
+                                {msg}
+                            </li>
                         ))}
                     </ul>
 

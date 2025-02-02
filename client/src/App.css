@@ -9,6 +9,7 @@
   --color-shadow: #cbced1;
   --color-shadow-light: #fff;
   --color-placeholder: gray;
+  --color-text: #333;
 
   --radius-lg: 20px;
   --radius-md: 10px;
@@ -232,4 +233,17 @@ li:last-child {
     background: rgba(255, 68, 68, 0.1);
     border-radius: var(--radius-md);
     margin-bottom: 1rem;
+}
+
+.message {
+    color: var(--color-text);
+}
+
+.notification {
+    font-style: italic;
+    color: var(--color-primary);
+    background: rgba(29, 161, 242, 0.1);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    margin: 4px 0;
 }
